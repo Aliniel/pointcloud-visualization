@@ -1,0 +1,15 @@
+* {
+    font-family: 'Open Sans', sans-serif;
+}
+
+#chart-tolltip {
+    padding: 10px;
+    background-color: white;
+    border: solid 1px #1d89d4;
+    border-radius: 5px;
+}
+#chart-tolltip span.chart-tooltip-title {
+    color: #1d89d4;
+    font-style: italic;
+    font-weight: bold;
+}
