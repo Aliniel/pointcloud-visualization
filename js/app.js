@@ -1,7 +1,5 @@
 // --- Module for managing three.js ---
 const visualization = (function initialize() {
-    const container = document.getElementById('main-wrapper');
-
     // --- Attributes ---
     // Setting up Scene, Camera and Renderer
     const scene = new THREE.Scene();
@@ -16,7 +14,6 @@ const visualization = (function initialize() {
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.autoClear = true;
-    container.appendChild(renderer.domElement);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
@@ -30,6 +27,12 @@ const visualization = (function initialize() {
     // Scanned Point Cloud
     const scannedParams = {};
     scannedParams.size = 1;
+
+    // Cache DOM
+    const $container = $('#main-wrapper');
+    const $legendWrapper = $('#legend-wrapper');
+    const $scannedColor = $legendWrapper.find('#scanned-color').find('i');
+    const $completedColor = $legendWrapper.find('#completed-color').find('i');
 
     // --- Functions ---
     // Renders the scene
@@ -95,6 +98,7 @@ const visualization = (function initialize() {
         }
     }
 
+    // Creates a div with text
     function createText() {
         const div = document.createElement('div');
         div.className = 'text-label';
@@ -153,7 +157,7 @@ const visualization = (function initialize() {
         const text = createText();
         text.setHTML(i.toString());
         text.setParent(sphere);
-        container.appendChild(text.element);
+        $container[0].appendChild(text.element);
         axesValueLabels.push(text);
     }
 
@@ -229,7 +233,18 @@ const visualization = (function initialize() {
         }
     }
 
+    // Set color for the scanned pixels
+    function setScannedColor(color) {
+        $scannedColor.css('color', color);
+    }
+
+    // Set color for the completed pixels
+    function setCompletedColor(color) {
+        $completedColor.css('color', color);
+    }
+
     // --- Call one-time functions
+    $container[0].appendChild(renderer.domElement);
     createAxes();
     render();
 
@@ -243,6 +258,8 @@ const visualization = (function initialize() {
         addSymmetryPlanes,
         render,
         clearScene,
+        setScannedColor,
+        setCompletedColor,
     };
 }());
 
@@ -313,7 +330,7 @@ const visualMapping = (function initialize() {
         }
     }
 
-    // Fillt he point cloud with data
+    // Fill the point cloud with data
     function fillPointCloud(vertexes) {
         pointCloud.x = vertexes.x;
         pointCloud.y = vertexes.y;
@@ -323,6 +340,8 @@ const visualMapping = (function initialize() {
         visualization.clearScene();
         visualization.addPointCloud(pointCloud, pointColors, 'pointCloud');
         visualization.addSymmetryLines(symmetryLines, 'symmetryLines');
+        visualization.setScannedColor(`rgb(${Math.round(scannedColor.r * 255)}, ${Math.round(scannedColor.g * 255)}, ${Math.round(scannedColor.b * 255)})`);
+        visualization.setCompletedColor(`rgb(${Math.round(completedColor.r * 255)}, ${Math.round(completedColor.g * 255)}, ${Math.round(completedColor.b * 255)})`);
         visualization.render();
     }
 
