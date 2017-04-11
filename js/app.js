@@ -317,35 +317,17 @@ const visualMapping = (function initialize() {
             }
         }
 
-        symmetryLines.color = [];
-        symmetryLines.start.x = [];
-        symmetryLines.start.y = [];
-        symmetryLines.start.z = [];
-        symmetryLines.end.x = [];
-        symmetryLines.end.y = [];
-        symmetryLines.end.z = [];
-        for (let i = 0; i < 3; i += 1) {
-            const red = Math.random();
-            const green = Math.random();
-            const blue = Math.random();
-            symmetryLines.color.push(new THREE.Color(red, green, blue));
-
-            let x = Math.floor(Math.random() * 1000);
-            let y = Math.floor(Math.random() * 1000);
-            let z = Math.floor(Math.random() * 1000);
-
-            symmetryLines.start.x.push(-x);
-            symmetryLines.start.y.push(-y);
-            symmetryLines.start.z.push(-z);
-
-            x = Math.floor(Math.random() * 1000);
-            y = Math.floor(Math.random() * 1000);
-            z = Math.floor(Math.random() * 1000);
-
-            symmetryLines.end.x.push(x);
-            symmetryLines.end.y.push(y);
-            symmetryLines.end.z.push(z);
-        }
+        symmetryLines.color = [
+            new THREE.Color(255, 255, 0),
+            new THREE.Color(255, 0, 255),
+            new THREE.Color(0, 255, 255),
+        ];
+        symmetryLines.start.x = [-200, -120, -90];
+        symmetryLines.start.y = [80, 180, 110];
+        symmetryLines.start.z = [8, 10, 80];
+        symmetryLines.end.x = [200, 100, -40];
+        symmetryLines.end.y = [80, 0, 180];
+        symmetryLines.end.z = [8, 10, -60];
     }
 
     // Fill the point cloud with data
