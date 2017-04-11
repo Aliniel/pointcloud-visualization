@@ -2,14 +2,26 @@
     font-family: 'Open Sans', sans-serif;
 }
 
-#chart-tolltip {
-    padding: 10px;
-    background-color: white;
-    border: solid 1px #1d89d4;
-    border-radius: 5px;
+body {
+    margin: 0;
+    overflow: hidden;
 }
-#chart-tolltip span.chart-tooltip-title {
-    color: #1d89d4;
-    font-style: italic;
-    font-weight: bold;
+
+div#main-wrapper {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#file-input {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+}
+
+.text-label {
+    color: #fff;
+    font-family: "Fira Mono", Monaco, "Andale Mono", "Lucida Console", "Bitstream Vera Sans Mono", "Courier New", Courier, monospace;
+    margin: -5px 0 0 15px;
+    pointer-events:none;
 }
