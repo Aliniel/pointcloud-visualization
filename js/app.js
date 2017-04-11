@@ -1,5 +1,5 @@
 // --- Module for managing three.js ---
-const visualiation = (function initialize() {
+const visualization = (function initialize() {
     // --- Attributes ---
     // Setting up Scene, Camera and Renderer
     const scene = new THREE.Scene();
@@ -7,105 +7,198 @@ const visualiation = (function initialize() {
         75,
         window.innerWidth / window.innerHeight,
         0.1,
-        1000,
+        1000
     );
     camera.position.z = 1000 / 4;
-    const renderer = new THREE.WebGLRenderer();
 
+    const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.autoClear = true;
     document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
     // Scanned Point Cloud
     const scannedParams = {};
     scannedParams.size = 1;
-    scannedParams.colors = [];
-    let scannedGeometry;
-    let scannedMaterials;
-    let scannedPointCloud;
+    // let geometry;
+    // let materials;
 
     // --- Functions ---
     function render() {
-        requestAnimationFrame(render);
+        // requestAnimationFrame(render);
         camera.lookAt(scene.position);
         renderer.render(scene, camera);
     }
 
-    // Prints the point cloud data
-    function printPointCloud(pointCloudData) {
-        scannedGeometry = new THREE.Geometry();
-        const xTreshold = Math.floor(Math.random() * pointCloudData.x.length);
-
-        const vertexCount = pointCloudData.x.length;
-        for (let i = 0; i < vertexCount; i += 1) {
-            const vertex = new THREE.Vector3();
-            vertex.x = pointCloudData.x[i] * 1000;
-            vertex.y = pointCloudData.y[i] * 1000;
-            vertex.z = pointCloudData.z[i] * 1000;
-            
-            scannedGeometry.vertices.push(vertex);
-
-            // Set vertex color
-            scannedParams.colors[i] = new THREE.Color();
-            if (i < xTreshold) {
-                scannedParams.colors[i].setRGB(0.5, 0.5, 0);
-            } else {
-                scannedParams.colors[i].setRGB(0.5, 0, 0.5);
-            }
+    // Draws the plane of symmetry
+    // TODO: Add parameters for drawing the plane
+    function addSymmetryPlanes(planes) {
+        const n = planes.width.length;
+        for (let i = 0; i < n; i += 1) {
+            // PlaneBufferGeometry: Width, Height
+            const geometry = new THREE.PlaneBufferGeometry(planes.width[i], planes.height[i]);
+            const material = new THREE.MeshBasicMaterial({
+                color: planes.color[i],
+                transparent: true,
+                opacity: 0.25,
+            });
+            const plane = new THREE.Mesh(geometry, material);
+            scene.add(plane);
+            plane.rotate(planes.rotation[i]);
+            plane.translate(planes.translation[i]);
         }
-        scannedGeometry.colors = scannedParams.colors;
+    }
 
-        scannedMaterials = new THREE.PointsMaterial({
+    // Draws the line of symmetry
+    // TODO: Add parameters for drawing the line
+    function addSymmetryLines(lines) {
+        const n = lines.color.length;
+        for (let i = 0; i < n; i += 1) {
+            const material = new THREE.LineBasicMaterial({
+                color: lines.color[i],
+            });
+
+            const geometry = new THREE.Geometry();
+            geometry.vertices.push(
+                new THREE.Vector3(lines.start.x[i], lines.start.y[i], lines.start.z[i]),
+                new THREE.Vector3(lines.end.x[i], lines.end.y[i], lines.end.z[i])
+            );
+
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+        }
+    }
+
+    // Prints the point cloud data
+    function addPointCloud(pointCloudData, pointColors) {
+        const geometry = new THREE.Geometry();
+
+        const n = pointCloudData.x.length;
+        for (let i = 0; i < n; i += 1) {
+            const vertex = new THREE.Vector3(
+                pointCloudData.x[i] * 1000,
+                pointCloudData.y[i] * 1000,
+                pointCloudData.z[i] * 1000
+            );
+            geometry.vertices.push(vertex);
+        }
+        geometry.colors = pointColors;
+
+        const materials = new THREE.PointsMaterial({
             size: scannedParams.size,
             transparent: true,
             opacity: 0.7,
             vertexColors: THREE.VertexColors,
         });
 
-        scannedPointCloud = new THREE.Points(scannedGeometry, scannedMaterials);
-        scene.add(scannedPointCloud);
-
-        drawSymmetryPlane();
-        drawSymmetryLine();
-
-        render();
+        const pointCloud = new THREE.Points(geometry, materials);
+        scene.add(pointCloud);
     }
 
-    // Draws the plane of symmetry
-    // TODO: Add parameters for drawing the plane
-    function drawSymmetryPlane() {
-        // PlaneBufferGeometry: Width, Height
-        const geometry = new THREE.PlaneBufferGeometry(300, 300);
-        const material = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.25,
-        });
-        const plane = new THREE.Mesh(geometry, material);
-        scene.add(plane);
-        plane.rotateY(45);
-        plane.translateY(100);
+    // Clear the scene
+    function clearScene() {
+        while (scene.children.length) {
+            scene.remove(scene.children[0]);
+        }
     }
 
-    // Draws the line of symmetry
-    // TODO: Add parameters for drawing the line
-    function drawSymmetryLine() {
-        const material = new THREE.LineBasicMaterial({
-            color: 0xffffff,
-        });
+    // --- Bind events ---
+    controls.addEventListener('change', render);
 
-        const geometry = new THREE.Geometry();
-        geometry.vertices.push(
-            new THREE.Vector3(-100, 100, 0),
-            new THREE.Vector3(100, 100, 0),
-        );
-
-        const line = new THREE.Line(geometry, material);
-        scene.add(line);
-    }
-
-    // --- Reveal ---
+    // --- Reveal public methods ---
     return {
-        printPointCloud,
+        addPointCloud,
+        addSymmetryLines,
+        addSymmetryPlanes,
+        render,
+        clearScene,
+    };
+}());
+
+// --- Viasual Mapping Module ---
+const visualMapping = (function initialize() {
+    // --- Attributes ---
+    const pointCloud = {};
+    const symmetryLines = {};
+    symmetryLines.start = {};
+    symmetryLines.start.x = [];
+    symmetryLines.start.y = [];
+    symmetryLines.start.z = [];
+    symmetryLines.end = {};
+    symmetryLines.end.x = [];
+    symmetryLines.end.y = [];
+    symmetryLines.end.z = [];
+    const symmetryPlanes = {};
+    let pointColors = [];
+    const scannedColor = new THREE.Color(0.5, 0.5, 0);
+    const completedColor = new THREE.Color(0.5, 0, 0.5);
+
+    // --- Functions ---
+    // Randomly choose points which will be marked as "completed",
+    // and generate symmetri axes and planes
+    function genSyntheticData() {
+        const n = pointCloud.x.length;
+        const xTreshold = Math.floor(Math.random() * n);
+        const yTreshold = Math.floor(Math.random() * n);
+        const zTreshold = Math.floor(Math.random() * n);
+
+        pointColors = [];
+        for (let i = 0; i < n; i += 1) {
+            if (i < xTreshold && i < yTreshold && i < zTreshold) {
+                pointColors[i] = completedColor;
+            } else {
+                pointColors[i] = scannedColor;
+            }
+        }
+
+        symmetryLines.color = [];
+        symmetryLines.start.x = [];
+        symmetryLines.start.y = [];
+        symmetryLines.start.z = [];
+        symmetryLines.end.x = [];
+        symmetryLines.end.y = [];
+        symmetryLines.end.z = [];
+        for (let i = 0; i < 3; i += 1) {
+            const red = Math.random();
+            const green = Math.random();
+            const blue = Math.random();
+            symmetryLines.color.push(new THREE.Color(red, green, blue));
+
+            let x = Math.floor(Math.random() * 1000);
+            let y = Math.floor(Math.random() * 1000);
+            let z = Math.floor(Math.random() * 1000);
+
+            symmetryLines.start.x.push(-x);
+            symmetryLines.start.y.push(-y);
+            symmetryLines.start.z.push(-z);
+
+            x = Math.floor(Math.random() * 1000);
+            y = Math.floor(Math.random() * 1000);
+            z = Math.floor(Math.random() * 1000);
+
+            symmetryLines.end.x.push(x);
+            symmetryLines.end.y.push(y);
+            symmetryLines.end.z.push(z);
+        }
+    }
+
+    // Fillt he point cloud with data
+    function fillPointCloud(vertexes) {
+        pointCloud.x = vertexes.x;
+        pointCloud.y = vertexes.y;
+        pointCloud.z = vertexes.z;
+
+        genSyntheticData();
+        visualization.clearScene();
+        visualization.addPointCloud(pointCloud, pointColors);
+        visualization.addSymmetryLines(symmetryLines);
+        visualization.render();
+    }
+
+    // --- Reveal public methods ---
+    return {
+        fillPointCloud,
     };
 }());
 
@@ -174,7 +267,7 @@ const dataManager = (function initialize() {
         }
 
         // Draw the data
-        visualiation.printPointCloud(vertexes);
+        visualMapping.fillPointCloud(vertexes);
     }
 
     // Read file content
