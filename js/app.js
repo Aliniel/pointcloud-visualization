@@ -69,8 +69,8 @@ const visualization = (function initialize() {
             });
             const plane = new THREE.Mesh(geometry, material);
             scene.add(plane);
-            plane.rotate(planes.rotation[i]);
-            plane.translate(planes.translation[i]);
+            plane.rotation = planes.rotation[i];
+            plane.translateOnAxis(planes.translationVector[i], planes.translationDistance[i]);
 
             saveGeometry(label, plane);
         }
@@ -295,6 +295,12 @@ const visualMapping = (function initialize() {
     symmetryLines.end.y = [];
     symmetryLines.end.z = [];
     const symmetryPlanes = {};
+    symmetryPlanes.width = [];
+    symmetryPlanes.height = [];
+    symmetryPlanes.color = [];
+    symmetryPlanes.translationDistance = [];
+    symmetryPlanes.translationVector = [];
+    symmetryPlanes.rotation = [];
     let pointColors = [];
     const scannedColor = new THREE.Color(0.5, 0.5, 0);
     const completedColor = new THREE.Color(0.5, 0, 0.5);
@@ -328,6 +334,13 @@ const visualMapping = (function initialize() {
         symmetryLines.end.x = [200, 100, -40];
         symmetryLines.end.y = [80, 0, 180];
         symmetryLines.end.z = [8, 10, -60];
+
+        symmetryPlanes.width = [200];
+        symmetryPlanes.height = [200];
+        symmetryPlanes.color = [new THREE.Color(200, 200, 200)];
+        symmetryPlanes.translationDistance = [100];
+        symmetryPlanes.translationVector = [new THREE.Vector3(0, 1, 0.1)];
+        symmetryPlanes.rotation = [new THREE.Euler(0, 1, 1.57)];
     }
 
     // Fill the point cloud with data
@@ -340,6 +353,7 @@ const visualMapping = (function initialize() {
         visualization.clearScene();
         visualization.addPointCloud(pointCloud, pointColors, 'pointCloud');
         visualization.addSymmetryLines(symmetryLines, 'symmetryLines');
+        visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes');
         visualization.setScannedColor(`rgb(${Math.round(scannedColor.r * 255)}, ${Math.round(scannedColor.g * 255)}, ${Math.round(scannedColor.b * 255)})`);
         visualization.setCompletedColor(`rgb(${Math.round(completedColor.r * 255)}, ${Math.round(completedColor.g * 255)}, ${Math.round(completedColor.b * 255)})`);
         visualization.render();
