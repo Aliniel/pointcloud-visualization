@@ -140,7 +140,11 @@ const visualization = (function initialize() {
     // Add a signle value to the axis
     function createAxisValue(i, axis) {
         const geometry = new THREE.SphereGeometry(1, 2, 2);
-        const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.5,
+        });
         const sphere = new THREE.Mesh(geometry, material);
         scene.add(sphere);
 
@@ -163,28 +167,42 @@ const visualization = (function initialize() {
 
     // Adds axes to the scene
     function createAxes() {
-        const axes = {};
         const axesLength = 200;
-        // They all start at the start of the coordinate system
-        axes.start = {};
-        axes.start.x = [-axesLength, 0, 0];
-        axes.start.y = [0, -axesLength, 0];
-        axes.start.z = [0, 0, -axesLength];
+        const axesColor = new THREE.Color(1, 1, 1);
 
-        // They end in a galaxy far, far away...
-        axes.end = {};
-        axes.end.x = [axesLength, 0, 0];
-        axes.end.y = [0, axesLength, 0];
-        axes.end.z = [0, 0, axesLength];
-
-        axes.color = [
-            new THREE.Color(1, 1, 1),
-            new THREE.Color(1, 1, 1),
-            new THREE.Color(1, 1, 1),
+        const axesStart = [
+            new THREE.Vector3(-axesLength, 0, 0),
+            new THREE.Vector3(0, -axesLength, 0),
+            new THREE.Vector3(0, 0, -axesLength),
+        ];
+        const axesEnd = [
+            new THREE.Vector3(axesLength, 0, 0),
+            new THREE.Vector3(0, axesLength, 0),
+            new THREE.Vector3(0, 0, axesLength),
         ];
 
+        const material = new THREE.LineBasicMaterial({
+            color: axesColor,
+            transparent: true,
+            opacity: 0.5,
+        });
+
+        // Axes shouldn't be removed. Ever.
         persistantGeometries.push('axes');
-        addSymmetryLines(axes, 'axes');
+
+        // Draw them all
+        for (let i = 0; i < axesStart.length; i += 1) {
+            const geometry = new THREE.Geometry();
+            geometry.vertices.push(
+                axesStart[i],
+                axesEnd[i]
+            );
+
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+
+            saveGeometry('axes', line);
+        }
 
         // Draw axes values
         for (let i = -axesLength; i <= axesLength; i += 20) {
