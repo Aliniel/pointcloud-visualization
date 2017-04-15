@@ -24,6 +24,9 @@ const visualization = (function initialize() {
 
     const axesValueLabels = [];
 
+    let scannedVisible = true;
+    let completedVisible = true;
+
     // Scanned Point Cloud
     const scannedParams = {};
     scannedParams.size = 1;
@@ -65,7 +68,7 @@ const visualization = (function initialize() {
             const material = new THREE.MeshBasicMaterial({
                 color: planes.color[i],
                 transparent: true,
-                opacity: 0.25,
+                opacity: 0.15,
             });
             const plane = new THREE.Mesh(geometry, material);
             scene.add(plane);
@@ -213,25 +216,24 @@ const visualization = (function initialize() {
     }
 
     // Prints the point cloud data
-    function addPointCloud(pointCloudData, pointColors, label) {
+    function addPointCloud(pointCloudData, label) {
         const geometry = new THREE.Geometry();
 
-        const n = pointCloudData.x.length;
+        const n = pointCloudData.vertices.x.length;
         for (let i = 0; i < n; i += 1) {
             const vertex = new THREE.Vector3(
-                pointCloudData.x[i] * 1000,
-                pointCloudData.y[i] * 1000,
-                pointCloudData.z[i] * 1000
+                pointCloudData.vertices.x[i] * 1000,
+                pointCloudData.vertices.y[i] * 1000,
+                pointCloudData.vertices.z[i] * 1000
             );
             geometry.vertices.push(vertex);
         }
-        geometry.colors = pointColors;
 
         const materials = new THREE.PointsMaterial({
+            color: pointCloudData.color,
             size: scannedParams.size,
             transparent: true,
             opacity: 0.7,
-            vertexColors: THREE.VertexColors,
         });
 
         const pointCloud = new THREE.Points(geometry, materials);
@@ -261,6 +263,27 @@ const visualization = (function initialize() {
         $completedColor.css('color', color);
     }
 
+    // Show or hide point cloud
+    function togglePointCloudVisibility(pointCloudToToggle) {
+        if (pointCloudToToggle === 'scanned') {
+            scannedVisible = !scannedVisible;
+            if (scannedVisible) {
+                scene.add(geometryCache.scannedPoints[0]);
+            } else {
+                scene.remove(geometryCache.scannedPoints[0]);
+            }
+        } else {
+            completedVisible = !completedVisible;
+            if (completedVisible) {
+                scene.add(geometryCache.completedPoints[0]);
+            } else {
+                scene.remove(geometryCache.completedPoints[0]);
+            }
+        }
+
+        render();
+    }
+
     // --- Call one-time functions
     $container[0].appendChild(renderer.domElement);
     createAxes();
@@ -278,6 +301,7 @@ const visualization = (function initialize() {
         clearScene,
         setScannedColor,
         setCompletedColor,
+        togglePointCloudVisibility,
     };
 }());
 
@@ -285,6 +309,21 @@ const visualization = (function initialize() {
 const visualMapping = (function initialize() {
     // --- Attributes ---
     const pointCloud = {};
+    pointCloud.completed = {};
+    pointCloud.scanned = {};
+    pointCloud.completed.vertices = {
+        x: [],
+        y: [],
+        z: [],
+    };
+    pointCloud.scanned.vertices = {
+        x: [],
+        y: [],
+        z: [],
+    };
+    pointCloud.completed.color = new THREE.Color(0.5, 0.5, 0);
+    pointCloud.scanned.color = new THREE.Color(0.5, 0, 0.5);
+
     const symmetryLines = {};
     symmetryLines.start = {};
     symmetryLines.start.x = [];
@@ -301,25 +340,25 @@ const visualMapping = (function initialize() {
     symmetryPlanes.translationDistance = [];
     symmetryPlanes.translationVector = [];
     symmetryPlanes.rotation = [];
-    let pointColors = [];
-    const scannedColor = new THREE.Color(0.5, 0.5, 0);
-    const completedColor = new THREE.Color(0.5, 0, 0.5);
 
     // --- Functions ---
     // Randomly choose points which will be marked as "completed",
     // and generate symmetri axes and planes
-    function genSyntheticData() {
-        const n = pointCloud.x.length;
+    function genSyntheticData(vertexes) {
+        const n = vertexes.x.length;
         const xTreshold = Math.floor(Math.random() * n);
         const yTreshold = Math.floor(Math.random() * n);
         const zTreshold = Math.floor(Math.random() * n);
 
-        pointColors = [];
         for (let i = 0; i < n; i += 1) {
             if (i < xTreshold && i < yTreshold && i < zTreshold) {
-                pointColors[i] = completedColor;
+                pointCloud.completed.vertices.x.push(vertexes.x[i]);
+                pointCloud.completed.vertices.y.push(vertexes.y[i]);
+                pointCloud.completed.vertices.z.push(vertexes.z[i]);
             } else {
-                pointColors[i] = scannedColor;
+                pointCloud.scanned.vertices.x.push(vertexes.x[i]);
+                pointCloud.scanned.vertices.y.push(vertexes.y[i]);
+                pointCloud.scanned.vertices.z.push(vertexes.z[i]);
             }
         }
 
@@ -349,13 +388,14 @@ const visualMapping = (function initialize() {
         pointCloud.y = vertexes.y;
         pointCloud.z = vertexes.z;
 
-        genSyntheticData();
+        genSyntheticData(vertexes);
         visualization.clearScene();
-        visualization.addPointCloud(pointCloud, pointColors, 'pointCloud');
+        visualization.addPointCloud(pointCloud.scanned, 'scannedPoints');
+        visualization.addPointCloud(pointCloud.completed, 'completedPoints');
         visualization.addSymmetryLines(symmetryLines, 'symmetryLines');
         visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes');
-        visualization.setScannedColor(`rgb(${Math.round(scannedColor.r * 255)}, ${Math.round(scannedColor.g * 255)}, ${Math.round(scannedColor.b * 255)})`);
-        visualization.setCompletedColor(`rgb(${Math.round(completedColor.r * 255)}, ${Math.round(completedColor.g * 255)}, ${Math.round(completedColor.b * 255)})`);
+        visualization.setScannedColor(`rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`);
+        visualization.setCompletedColor(`rgb(${Math.round(pointCloud.completed.color.r * 255)}, ${Math.round(pointCloud.completed.color.g * 255)}, ${Math.round(pointCloud.completed.color.b * 255)})`);
         visualization.render();
     }
 
@@ -363,6 +403,35 @@ const visualMapping = (function initialize() {
     return {
         fillPointCloud,
     };
+}());
+
+const userInteraction = (function initialize() {
+    // --- DOM Cache ---
+    const $legendWrapper = $('#legend-wrapper');
+    const $toggleScannedButton = $legendWrapper.find('#scanned-color');
+    const $toggleCompletedButton = $legendWrapper.find('#completed-color');
+
+    // --- Functions ---
+    // Toggle point cloud visibility - called on click
+    function togglePoints() {
+        if ($(this).attr('id') === 'scanned-color') {
+            visualization.togglePointCloudVisibility('scanned');
+        } else {
+            visualization.togglePointCloudVisibility('completed');
+        }
+        const $eye = $(this).find('i');
+        if ($eye.hasClass('fa-eye')) {
+            $eye.removeClass('fa-eye');
+            $eye.addClass('fa-eye-slash');
+        } else {
+            $eye.removeClass('fa-eye-slash');
+            $eye.addClass('fa-eye');
+        }
+    }
+
+    // --- Bindings ---
+    $toggleScannedButton.click(togglePoints);
+    $toggleCompletedButton.click(togglePoints);
 }());
 
 // --- Module for managing data ---

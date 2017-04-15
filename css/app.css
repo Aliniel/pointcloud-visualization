@@ -44,6 +44,9 @@ div#main-wrapper {
 #legend-wrapper li {
     list-style: none;
 }
+#legend-wrapper li:hover {
+    cursor: pointer;
+}
 
 #legend-wrapper i.fa {
     padding: 0 5px;
