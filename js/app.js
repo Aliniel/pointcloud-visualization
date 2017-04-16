@@ -24,9 +24,6 @@ const visualization = (function initialize() {
 
     const axesValueLabels = [];
 
-    let scannedVisible = true;
-    let completedVisible = true;
-
     // Scanned Point Cloud
     const scannedParams = {};
     scannedParams.size = 1;
@@ -48,9 +45,12 @@ const visualization = (function initialize() {
     // Saves geometry
     function saveGeometry(label, geometry) {
         if (!geometryCache[label]) {
-            geometryCache[label] = [];
+            geometryCache[label] = {
+                mesh: [],
+                visible: true,
+            };
         }
-        geometryCache[label].push(geometry);
+        geometryCache[label].mesh.push(geometry);
 
         if (persistantGeometries.indexOf(label) === -1
         && dataGeometries.indexOf(label) === -1) {
@@ -264,22 +264,13 @@ const visualization = (function initialize() {
     }
 
     // Show or hide point cloud
-    function togglePointCloudVisibility(pointCloudToToggle) {
-        if (pointCloudToToggle === 'scanned') {
-            scannedVisible = !scannedVisible;
-            if (scannedVisible) {
-                scene.add(geometryCache.scannedPoints[0]);
-            } else {
-                scene.remove(geometryCache.scannedPoints[0]);
-            }
+    function toggleObjectVisibility(objectLabel) {
+        if (geometryCache[objectLabel].visible) {
+            geometryCache[objectLabel].mesh.forEach(mesh => scene.remove(mesh));
         } else {
-            completedVisible = !completedVisible;
-            if (completedVisible) {
-                scene.add(geometryCache.completedPoints[0]);
-            } else {
-                scene.remove(geometryCache.completedPoints[0]);
-            }
+            geometryCache[objectLabel].mesh.forEach(mesh => scene.add(mesh));
         }
+        geometryCache[objectLabel].visible = !geometryCache[objectLabel].visible;
 
         render();
     }
@@ -301,7 +292,7 @@ const visualization = (function initialize() {
         clearScene,
         setScannedColor,
         setCompletedColor,
-        togglePointCloudVisibility,
+        toggleObjectVisibility,
     };
 }());
 
@@ -415,9 +406,9 @@ const userInteraction = (function initialize() {
     // Toggle point cloud visibility - called on click
     function togglePoints() {
         if ($(this).attr('id') === 'scanned-color') {
-            visualization.togglePointCloudVisibility('scanned');
+            visualization.toggleObjectVisibility('scannedPoints');
         } else {
-            visualization.togglePointCloudVisibility('completed');
+            visualization.toggleObjectVisibility('completedPoints');
         }
         const $eye = $(this).find('i');
         if ($eye.hasClass('fa-eye')) {
