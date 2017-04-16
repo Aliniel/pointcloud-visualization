@@ -19,7 +19,7 @@ div#main-wrapper {
     left: 1em;
 }
 
-#legend-wrapper {
+#tools-wrapper {
     position: fixed;
     top: 1em;
     right: 1em;
@@ -29,27 +29,29 @@ div#main-wrapper {
     box-shadow: 0 0 25px 1px rgba(255, 255, 255, .5);
 }
 
-#legend-wrapper > p {
+#tools-wrapper > p {
     margin: 10px;
     text-align: center;
     font-size: 2em;
     font-weight: bold;
 }
 
-#legend-wrapper ul {
+#tools-wrapper ul {
     margin: 10px;
     padding: 0;
+    user-select: none;
 }
 
-#legend-wrapper li {
+#tools-wrapper li {
     list-style: none;
 }
-#legend-wrapper li:hover {
+#tools-wrapper li:hover {
     cursor: pointer;
 }
 
-#legend-wrapper i.fa {
+#tools-wrapper i.fa {
     padding: 0 5px;
+    color: #444;
 }
 
 .text-label {

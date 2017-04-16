@@ -30,9 +30,10 @@ const visualization = (function initialize() {
 
     // Cache DOM
     const $container = $('#main-wrapper');
-    const $legendWrapper = $('#legend-wrapper');
-    const $scannedColor = $legendWrapper.find('#scanned-color').find('i');
-    const $completedColor = $legendWrapper.find('#completed-color').find('i');
+    const $toolsWrapper = $('#tools-wrapper');
+    const $scannedColor = $toolsWrapper.find('#scanned-color').find('i');
+    const $completedColor = $toolsWrapper.find('#completed-color').find('i');
+    let $axesLabels;
 
     // --- Functions ---
     // Renders the scene
@@ -271,6 +272,14 @@ const visualization = (function initialize() {
             geometryCache[objectLabel].mesh.forEach(mesh => scene.add(mesh));
         }
         geometryCache[objectLabel].visible = !geometryCache[objectLabel].visible;
+        if (objectLabel === 'axes') {
+            try {
+                $axesLabels.toggle();
+            } catch (err) {
+                $axesLabels = $('.text-label');
+                $axesLabels.toggle();
+            }
+        }
 
         render();
     }
@@ -293,6 +302,43 @@ const visualization = (function initialize() {
         setScannedColor,
         setCompletedColor,
         toggleObjectVisibility,
+    };
+}());
+
+// --- User Interactions Module ---
+const userInteraction = (function initialize() {
+    // --- DOM Cache ---
+    const $toolsWrapper = $('#tools-wrapper').find('ul');
+
+    // --- Functions ---
+    // Toggle point cloud visibility - called on click
+    function toggleObject() {
+        visualization.toggleObjectVisibility($(this).attr('id'));
+
+        const $eye = $(this).find('i');
+        if ($eye.hasClass('fa-eye')) {
+            $eye.removeClass('fa-eye');
+            $eye.addClass('fa-eye-slash');
+        } else {
+            $eye.removeClass('fa-eye-slash');
+            $eye.addClass('fa-eye');
+        }
+    }
+
+    // Adds interactive elements for a given object to the Tools panel
+    function addInteraction(id, alias, color) {
+        $toolsWrapper.append(`<li id="${id}"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>${alias}</li>`);
+        const $newElement = $toolsWrapper.find(`#${id}`);
+        $newElement.find('i').css('color', `${color}`);
+        $newElement.click(toggleObject);
+    }
+
+    // --- Bindings ---
+    // Bind toggle for present interactions at start
+    $toolsWrapper.find('li').click(toggleObject);
+
+    return {
+        addInteraction,
     };
 }());
 
@@ -382,11 +428,21 @@ const visualMapping = (function initialize() {
         genSyntheticData(vertexes);
         visualization.clearScene();
         visualization.addPointCloud(pointCloud.scanned, 'scannedPoints');
+        const scannedColorString = `rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`;
+        userInteraction.addInteraction('scannedPoints', 'Scanned Points', scannedColorString);
+
         visualization.addPointCloud(pointCloud.completed, 'completedPoints');
+        const completedColorString = `rgb(${Math.round(pointCloud.completed.color.r * 255)}, ${Math.round(pointCloud.completed.color.g * 255)}, ${Math.round(pointCloud.completed.color.b * 255)})`;
+        userInteraction.addInteraction('completedPoints', 'Completed Points', completedColorString);
+
         visualization.addSymmetryLines(symmetryLines, 'symmetryLines');
+        userInteraction.addInteraction('symmetryLines', 'Symmetry Axes', '#444');
+
         visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes');
-        visualization.setScannedColor(`rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`);
-        visualization.setCompletedColor(`rgb(${Math.round(pointCloud.completed.color.r * 255)}, ${Math.round(pointCloud.completed.color.g * 255)}, ${Math.round(pointCloud.completed.color.b * 255)})`);
+        userInteraction.addInteraction('symmetryPlanes', 'Symmetry Planes', '#444');
+
+        visualization.setScannedColor(scannedColorString);
+        visualization.setCompletedColor();
         visualization.render();
     }
 
@@ -394,35 +450,6 @@ const visualMapping = (function initialize() {
     return {
         fillPointCloud,
     };
-}());
-
-const userInteraction = (function initialize() {
-    // --- DOM Cache ---
-    const $legendWrapper = $('#legend-wrapper');
-    const $toggleScannedButton = $legendWrapper.find('#scanned-color');
-    const $toggleCompletedButton = $legendWrapper.find('#completed-color');
-
-    // --- Functions ---
-    // Toggle point cloud visibility - called on click
-    function togglePoints() {
-        if ($(this).attr('id') === 'scanned-color') {
-            visualization.toggleObjectVisibility('scannedPoints');
-        } else {
-            visualization.toggleObjectVisibility('completedPoints');
-        }
-        const $eye = $(this).find('i');
-        if ($eye.hasClass('fa-eye')) {
-            $eye.removeClass('fa-eye');
-            $eye.addClass('fa-eye-slash');
-        } else {
-            $eye.removeClass('fa-eye-slash');
-            $eye.addClass('fa-eye');
-        }
-    }
-
-    // --- Bindings ---
-    $toggleScannedButton.click(togglePoints);
-    $toggleCompletedButton.click(togglePoints);
 }());
 
 // --- Module for managing data ---
