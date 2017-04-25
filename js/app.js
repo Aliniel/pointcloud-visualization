@@ -383,7 +383,7 @@ const visualization = (function initialize() {
 const userInteraction = (function initialize() {
     // --- DOM Cache ---
     const $toolsWrapper = $('#tools-wrapper').find('ul');
-    const $canvas = $('canvas');
+    const persistantSettings = ['axes', 'selection'];
 
     // --- Functions ---
     // Toggle point cloud visibility - called on click
@@ -410,7 +410,11 @@ const userInteraction = (function initialize() {
 
     // Clears the toolbox
     function clearToolbox() {
-        $toolsWrapper.html('');
+        $toolsWrapper.find('li').each((index, element) => {
+            if (persistantSettings.indexOf($(element).prop('id')) === -1) {
+                $(element).remove();
+            }
+        });
     }
 
     // --- Bindings ---
@@ -521,8 +525,6 @@ const visualMapping = (function initialize() {
         genSyntheticData(vertexes);
         visualization.clearScene();
         userInteraction.clearToolbox();
-
-        userInteraction.addInteraction('axes', 'Coordinate Axes', '#444');
 
         visualization.addPointCloud(pointCloud.scanned, 'scannedPoints');
         const scannedColorString = `rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`;
