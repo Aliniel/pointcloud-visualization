@@ -238,7 +238,7 @@ const visualization = (function initialize() {
             );
             vertex.toArray(positions, i * 3);
 
-            alpha[i] = 1.0;
+            alpha[i] = 0.8;
             sizes[i] = scannedParams.size;
         }
         geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -370,6 +370,16 @@ const visualization = (function initialize() {
         }
     }
 
+    // Reset the highlight
+    function resetHighlight() {
+        selectedPoint = undefined;
+        const oldSelectionRegion = selectionRegion;
+        selectionRegion = 1000;
+        highlightArea(new THREE.Vector3(0, 0, 0));
+        render();
+        selectionRegion = oldSelectionRegion;
+    }
+
     // --- Call one-time functions
     $container[0].appendChild(renderer.domElement);
     createAxes();
@@ -377,7 +387,7 @@ const visualization = (function initialize() {
 
     // --- Bind events ---
     controls.addEventListener('change', render);
-    $container.mousedown(selectionHandler);
+    $container.click(selectionHandler);
 
     // --- Reveal public methods ---
     return {
@@ -390,6 +400,7 @@ const visualization = (function initialize() {
         setCompletedColor,
         toggleObjectVisibility,
         updateSelectionRegionSize,
+        resetHighlight,
     };
 }());
 
@@ -397,9 +408,10 @@ const visualization = (function initialize() {
 const userInteraction = (function initialize() {
     // --- DOM Cache ---
     const $toolsWrapper = $('#tools-wrapper').find('ul');
-    const persistantSettings = ['axes', 'selection-size'];
+    const persistantSettings = ['axes', 'selection-size', 'refresh'];
     const $selectionAreaSlider = $toolsWrapper.find('#selection-size').find('input[type="range"]');
     const $selectionAreaValue = $toolsWrapper.find('#selection-size').find('span');
+    const $resetButton = $toolsWrapper.find('#refresh');
 
     // --- Functions ---
     // Toggle point cloud visibility - called on click
@@ -440,10 +452,16 @@ const userInteraction = (function initialize() {
         visualization.updateSelectionRegionSize(value);
     }
 
+    // Reset the visualization to the default state
+    function resetVisualization() {
+        visualization.resetHighlight();
+    }
+
     // --- Bindings ---
     // Bind toggle for present interactions at start
     $toolsWrapper.find('.toggable').click(toggleObject);
     $selectionAreaSlider.on('input', updateSelectionSizeValue);
+    $resetButton.on('click', resetVisualization);
 
     return {
         addInteraction,
