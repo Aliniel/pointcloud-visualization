@@ -16,7 +16,6 @@ const visualization = (function initialize() {
     renderer.autoClear = true;
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    const projector = new THREE.Projector();
     const raycaster = new THREE.Raycaster();
 
     // Geometry Cache
@@ -29,6 +28,10 @@ const visualization = (function initialize() {
     // Scanned Point Cloud
     const scannedParams = {};
     scannedParams.size = 1;
+
+    // Adjustable variables
+    let selectionRegion = 20.0;
+    let selectedPoint;
 
     // Cache DOM
     const $container = $('#main-wrapper');
@@ -298,6 +301,40 @@ const visualization = (function initialize() {
         render();
     }
 
+    // Highlight area around a point
+    function highlightArea(pointPosition) {
+        // Highlight parameters
+        const fadedAlpha = 0.2;
+        const highlightedAlpha = 0.8;
+
+        // Traverse all points - scanned, completed...
+        const objects = geometryCache.scannedPoints.mesh.concat(geometryCache.completedPoints.mesh);
+        objects.forEach((object) => {
+            // Get all geometry Attributes and set new values
+            const positions = object.geometry.attributes.position;
+            const alphas = object.geometry.attributes.alpha;
+
+            const n = alphas.count;
+            for (let i = 0; i < n; i += 1) {
+                const j = i * 3;
+                const position = new THREE.Vector3(
+                    positions.array[j],
+                    positions.array[j + 1],
+                    positions.array[j + 2]
+                );
+
+                // Highlight sphere around selected point
+                if (pointPosition.distanceTo(position) > selectionRegion) {
+                    alphas.array[i] = fadedAlpha;
+                } else {
+                    alphas.array[i] = highlightedAlpha;
+                }
+            }
+
+            alphas.needsUpdate = true;
+        });
+    }
+
     // On mouse click event highlight the area around the selected point
     function selectionHandler(event) {
         event.preventDefault();
@@ -314,45 +351,21 @@ const visualization = (function initialize() {
         const points = geometryCache.scannedPoints.mesh.concat(geometryCache.completedPoints.mesh);
         const intersects = raycaster.intersectObjects(points);
 
-        // Highlight parameters
-        const region = 20.0;
-        const fadedAlpha = 0.2;
-        const highlightedAlpha = 0.8;
-
         if (intersects.length > 0) {
-            const index = intersects[0].index;
-
             // Point user clicked on
             const pointPosition = intersects[0].point;
+            selectedPoint = pointPosition;
 
-            // Traverse all points - scanned, completed...
-            const objects = points;
-            objects.forEach((object) => {
-                // Get all geometry Attributes and set new values
-                const positions = object.geometry.attributes.position;
-                const alphas = object.geometry.attributes.alpha;
+            highlightArea(pointPosition);
+            render();
+        }
+    }
 
-                const n = alphas.count;
-                for (let i = 0; i < n; i += 1) {
-                    const j = i * 3;
-                    const position = new THREE.Vector3(
-                        positions.array[j],
-                        positions.array[j + 1],
-                        positions.array[j + 2]
-                    );
-
-                    // Highlight sphere around selected point
-                    if (pointPosition.distanceTo(position) > region) {
-                        alphas.array[i] = fadedAlpha;
-                    } else {
-                        alphas.array[i] = highlightedAlpha;
-                    }
-                }
-
-                alphas.needsUpdate = true;
-            });
-
-            intersects[0].object.geometry.attributes.size.needsUpdate = true;
+    // Set the Highlight Region Size
+    function updateSelectionRegionSize(size) {
+        selectionRegion = size;
+        if (selectedPoint !== undefined) {
+            highlightArea(selectedPoint);
             render();
         }
     }
@@ -376,6 +389,7 @@ const visualization = (function initialize() {
         setScannedColor,
         setCompletedColor,
         toggleObjectVisibility,
+        updateSelectionRegionSize,
     };
 }());
 
@@ -383,7 +397,9 @@ const visualization = (function initialize() {
 const userInteraction = (function initialize() {
     // --- DOM Cache ---
     const $toolsWrapper = $('#tools-wrapper').find('ul');
-    const persistantSettings = ['axes', 'selection'];
+    const persistantSettings = ['axes', 'selection-size'];
+    const $selectionAreaSlider = $toolsWrapper.find('#selection-size').find('input[type="range"]');
+    const $selectionAreaValue = $toolsWrapper.find('#selection-size').find('span');
 
     // --- Functions ---
     // Toggle point cloud visibility - called on click
@@ -402,7 +418,7 @@ const userInteraction = (function initialize() {
 
     // Adds interactive elements for a given object to the Tools panel
     function addInteraction(id, alias, color) {
-        $toolsWrapper.append(`<li id="${id}"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>${alias}</li>`);
+        $toolsWrapper.append(`<li id="${id}" class="toggable"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>${alias}</li>`);
         const $newElement = $toolsWrapper.find(`#${id}`);
         $newElement.find('i').css('color', `${color}`);
         $newElement.click(toggleObject);
@@ -417,9 +433,17 @@ const userInteraction = (function initialize() {
         });
     }
 
+    // Updates the value field when the slider changes
+    function updateSelectionSizeValue() {
+        const value = $(this).val();
+        $selectionAreaValue.text(value);
+        visualization.updateSelectionRegionSize(value);
+    }
+
     // --- Bindings ---
     // Bind toggle for present interactions at start
-    $toolsWrapper.find('li').click(toggleObject);
+    $toolsWrapper.find('.toggable').click(toggleObject);
+    $selectionAreaSlider.on('input', updateSelectionSizeValue);
 
     return {
         addInteraction,
@@ -561,7 +585,7 @@ const dataManager = (function initialize() {
     vertexes.z = [];
 
     // --- Cache DOM ---
-    const $fileInput = $('input');
+    const $fileInput = $('input[type="file"]');
 
     // Parse loaded PLY file
     function parseData(content) {

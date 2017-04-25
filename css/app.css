@@ -44,9 +44,14 @@ div#main-wrapper {
 
 #tools-wrapper li {
     list-style: none;
+    margin: 5px 0;
 }
 #tools-wrapper li:hover {
     cursor: pointer;
+}
+
+#selection-size input[type="range"] {
+    display: block;
 }
 
 #tools-wrapper i.fa {

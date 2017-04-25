@@ -14,7 +14,13 @@
             <p>Tools</p>
             <hr/>
             <ul>
-                <li id="axes"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>Coordinate Axes</li>
+                <li id="axes" class="toggable"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>Coordinate Axes</li>
+                <li id="selection-size">
+                    <div>
+                        Selection Area Size
+                        <input type="range" value="20" min="5" max="50"/><span>20</span>
+                    </div>
+                </li>
                 <!-- User interaction will be inserted here via JavaScript. -->
             </ul>
         </div>
@@ -22,7 +28,6 @@
         <script src="js/jquery.min.js"></script>
         <script src="js/three.min.js"></script>
         <script src="js/OrbitControls.js"></script>
-        <script src="js/Projector.js"></script>
         <script src="js/app.js"></script>
 		<script type="x-shader/x-vertex" id="vertexshader">
 			attribute float size;
