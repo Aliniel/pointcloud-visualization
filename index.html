@@ -21,6 +21,30 @@
         <script src="js/jquery.min.js"></script>
         <script src="js/three.min.js"></script>
         <script src="js/OrbitControls.js"></script>
+        <script src="js/Projector.js"></script>
         <script src="js/app.js"></script>
+		<script type="x-shader/x-vertex" id="vertexshader">
+			attribute float size;
+            attribute float alpha;
+
+			varying float vAlpha;
+			void main() {
+                vAlpha = alpha;
+
+				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+				gl_PointSize = size * ( 300.0 / -mvPosition.z );
+				gl_Position = projectionMatrix * mvPosition;
+			}
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+			uniform vec3 color;
+
+            varying float vAlpha;
+			void main() {
+				gl_FragColor = vec4(color, vAlpha);
+			}
+		</script>
+
     </body>
 </html>

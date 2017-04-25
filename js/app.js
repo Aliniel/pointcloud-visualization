@@ -16,6 +16,8 @@ const visualization = (function initialize() {
     renderer.autoClear = true;
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    const projector = new THREE.Projector();
+    const raycaster = new THREE.Raycaster();
 
     // Geometry Cache
     const geometryCache = {};
@@ -218,23 +220,35 @@ const visualization = (function initialize() {
 
     // Prints the point cloud data
     function addPointCloud(pointCloudData, label) {
-        const geometry = new THREE.Geometry();
+        const geometry = new THREE.BufferGeometry();
 
         const n = pointCloudData.vertices.x.length;
+        const alpha = new Float32Array(n);
+        const positions = new Float32Array(n * 3);
+        const sizes = new Float32Array(n);
+
         for (let i = 0; i < n; i += 1) {
             const vertex = new THREE.Vector3(
                 pointCloudData.vertices.x[i] * 1000,
                 pointCloudData.vertices.y[i] * 1000,
                 pointCloudData.vertices.z[i] * 1000
             );
-            geometry.vertices.push(vertex);
-        }
+            vertex.toArray(positions, i * 3);
 
-        const materials = new THREE.PointsMaterial({
-            color: pointCloudData.color,
-            size: scannedParams.size,
+            alpha[i] = 1.0;
+            sizes[i] = scannedParams.size;
+        }
+        geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.addAttribute('alpha', new THREE.BufferAttribute(alpha, 1));
+        geometry.addAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const materials = new THREE.ShaderMaterial({
+            uniforms: {
+                color: { value: pointCloudData.color },
+            },
+            vertexShader: document.getElementById('vertexshader').textContent,
+            fragmentShader: document.getElementById('fragmentshader').textContent,
             transparent: true,
-            opacity: 0.7,
         });
 
         const pointCloud = new THREE.Points(geometry, materials);
@@ -284,6 +298,65 @@ const visualization = (function initialize() {
         render();
     }
 
+    // On mouse click event highlight the area around the selected point
+    function selectionHandler(event) {
+        event.preventDefault();
+
+        // Get Mouse position
+        const mouse = new THREE.Vector2(
+            ((event.clientX / window.innerWidth) * 2) - 1,
+            -((event.clientY / window.innerHeight) * 2) + 1
+        );
+
+        raycaster.setFromCamera(mouse, camera);
+
+        // Points to check intersection with
+        const points = geometryCache.scannedPoints.mesh.concat(geometryCache.completedPoints.mesh);
+        const intersects = raycaster.intersectObjects(points);
+
+        // Highlight parameters
+        const region = 20.0;
+        const fadedAlpha = 0.2;
+        const highlightedAlpha = 0.8;
+
+        if (intersects.length > 0) {
+            const index = intersects[0].index;
+
+            // Point user clicked on
+            const pointPosition = intersects[0].point;
+
+            // Traverse all points - scanned, completed...
+            const objects = points;
+            objects.forEach((object) => {
+                // Get all geometry Attributes and set new values
+                const positions = object.geometry.attributes.position;
+                const alphas = object.geometry.attributes.alpha;
+
+                const n = alphas.count;
+                for (let i = 0; i < n; i += 1) {
+                    const j = i * 3;
+                    const position = new THREE.Vector3(
+                        positions.array[j],
+                        positions.array[j + 1],
+                        positions.array[j + 2]
+                    );
+
+                    // Highlight sphere around selected point
+                    if (pointPosition.distanceTo(position) > region) {
+                        alphas.array[i] = fadedAlpha;
+                    } else {
+                        alphas.array[i] = highlightedAlpha;
+                    }
+                }
+
+                alphas.needsUpdate = true;
+            });
+
+            intersects[0].object.geometry.attributes.size.needsUpdate = true;
+            render();
+        }
+    }
+
     // --- Call one-time functions
     $container[0].appendChild(renderer.domElement);
     createAxes();
@@ -291,6 +364,7 @@ const visualization = (function initialize() {
 
     // --- Bind events ---
     controls.addEventListener('change', render);
+    $container.mousedown(selectionHandler);
 
     // --- Reveal public methods ---
     return {
@@ -309,6 +383,7 @@ const visualization = (function initialize() {
 const userInteraction = (function initialize() {
     // --- DOM Cache ---
     const $toolsWrapper = $('#tools-wrapper').find('ul');
+    const $canvas = $('canvas');
 
     // --- Functions ---
     // Toggle point cloud visibility - called on click
