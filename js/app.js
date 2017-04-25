@@ -247,7 +247,7 @@ const visualization = (function initialize() {
     function clearScene() {
         while (dataGeometries[0]) {
             const category = dataGeometries.pop();
-            geometryCache[category].forEach((geometry) => {
+            geometryCache[category].mesh.forEach((geometry) => {
                 scene.remove(geometry);
             });
             geometryCache[category] = undefined;
@@ -333,12 +333,18 @@ const userInteraction = (function initialize() {
         $newElement.click(toggleObject);
     }
 
+    // Clears the toolbox
+    function clearToolbox() {
+        $toolsWrapper.html('');
+    }
+
     // --- Bindings ---
     // Bind toggle for present interactions at start
     $toolsWrapper.find('li').click(toggleObject);
 
     return {
         addInteraction,
+        clearToolbox,
     };
 }());
 
@@ -387,6 +393,18 @@ const visualMapping = (function initialize() {
         const yTreshold = Math.floor(Math.random() * n);
         const zTreshold = Math.floor(Math.random() * n);
 
+        // Empty the previously loaded vertices
+        pointCloud.completed.vertices = {
+            x: [],
+            y: [],
+            z: [],
+        };
+        pointCloud.scanned.vertices = {
+            x: [],
+            y: [],
+            z: [],
+        };
+
         for (let i = 0; i < n; i += 1) {
             if (i < xTreshold && i < yTreshold && i < zTreshold) {
                 pointCloud.completed.vertices.x.push(vertexes.x[i]);
@@ -427,6 +445,10 @@ const visualMapping = (function initialize() {
 
         genSyntheticData(vertexes);
         visualization.clearScene();
+        userInteraction.clearToolbox();
+
+        userInteraction.addInteraction('axes', 'Coordinate Axes', '#444');
+
         visualization.addPointCloud(pointCloud.scanned, 'scannedPoints');
         const scannedColorString = `rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`;
         userInteraction.addInteraction('scannedPoints', 'Scanned Points', scannedColorString);
