@@ -36,6 +36,7 @@ const visualization = (function initialize() {
     // Cache DOM
     const $container = $('#main-wrapper');
     const $toolsWrapper = $('#tools-wrapper');
+    const $detailsWrapper = $('#details-wrapper');
     const $scannedColor = $toolsWrapper.find('#scanned-color').find('i');
     const $completedColor = $toolsWrapper.find('#completed-color').find('i');
     let $axesLabels;
@@ -46,6 +47,23 @@ const visualization = (function initialize() {
         camera.lookAt(scene.position);
         axesValueLabels.forEach(label => label.updatePosition());
         renderer.render(scene, camera);
+    }
+
+    // Add information to the details section in form of <label, value>
+    function addDetailsCategory(label) {
+        const formattedLabel = `<p class="details-category-label">${label}</p>`;
+        $detailsWrapper.append(formattedLabel);
+    }
+
+    // Add information to the details section in form of <label, value>
+    function addDetails(label, value, id = '') {
+        const formattedLabel = `<p><span id="${id}" class="details-label">${label}:</span> ${value}</p>`;
+        $detailsWrapper.append(formattedLabel);
+    }
+
+    // Clear the details section
+    function clearDetails() {
+        $detailsWrapper.find('p:not(.info-title)').remove();
     }
 
     // Saves geometry
@@ -274,11 +292,13 @@ const visualization = (function initialize() {
     // Set color for the scanned pixels
     function setScannedColor(color) {
         $scannedColor.css('color', color);
+        $detailsWrapper.find('#scanned-points-details').css('color', color);
     }
 
     // Set color for the completed pixels
     function setCompletedColor(color) {
         $completedColor.css('color', color);
+        $detailsWrapper.find('#completed-points-details').css('color', color);
     }
 
     // Show or hide point cloud
@@ -308,13 +328,16 @@ const visualization = (function initialize() {
         const highlightedAlpha = 0.8;
 
         // Traverse all points - scanned, completed...
-        const objects = geometryCache.scannedPoints.mesh.concat(geometryCache.completedPoints.mesh);
+        let totalPoints = 0;
+        let totalHighlighted = 0;
+        const objects = geometryCache['scanned-points'].mesh.concat(geometryCache['completed-points'].mesh);
         objects.forEach((object) => {
             // Get all geometry Attributes and set new values
             const positions = object.geometry.attributes.position;
             const alphas = object.geometry.attributes.alpha;
 
             const n = alphas.count;
+            totalPoints += n;
             for (let i = 0; i < n; i += 1) {
                 const j = i * 3;
                 const position = new THREE.Vector3(
@@ -328,11 +351,16 @@ const visualization = (function initialize() {
                     alphas.array[i] = fadedAlpha;
                 } else {
                     alphas.array[i] = highlightedAlpha;
+                    totalHighlighted += 1;
                 }
             }
 
             alphas.needsUpdate = true;
         });
+
+        $detailsWrapper.find('#selected-points-details').parent().remove();
+        const highlightPercentage = (totalHighlighted / totalPoints).toFixed(2);
+        addDetails('Selected Points', `${totalHighlighted} (${highlightPercentage}%)`, 'selected-points-details');
     }
 
     // On mouse click event highlight the area around the selected point
@@ -348,7 +376,7 @@ const visualization = (function initialize() {
         raycaster.setFromCamera(mouse, camera);
 
         // Points to check intersection with
-        const points = geometryCache.scannedPoints.mesh.concat(geometryCache.completedPoints.mesh);
+        const points = geometryCache['scanned-points'].mesh.concat(geometryCache['completed-points'].mesh);
         const intersects = raycaster.intersectObjects(points);
 
         if (intersects.length > 0) {
@@ -378,6 +406,7 @@ const visualization = (function initialize() {
         highlightArea(new THREE.Vector3(0, 0, 0));
         render();
         selectionRegion = oldSelectionRegion;
+        $detailsWrapper.find('#selected-points-details').parent().remove();
     }
 
     // --- Call one-time functions
@@ -401,6 +430,9 @@ const visualization = (function initialize() {
         toggleObjectVisibility,
         updateSelectionRegionSize,
         resetHighlight,
+        addDetailsCategory,
+        addDetails,
+        clearDetails,
     };
 }());
 
@@ -566,15 +598,24 @@ const visualMapping = (function initialize() {
 
         genSyntheticData(vertexes);
         visualization.clearScene();
+        visualization.clearDetails();
         userInteraction.clearToolbox();
 
-        visualization.addPointCloud(pointCloud.scanned, 'scannedPoints');
-        const scannedColorString = `rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`;
-        userInteraction.addInteraction('scannedPoints', 'Scanned Points', scannedColorString);
+        const scannedCount = pointCloud.scanned.vertices.x.length;
+        const completedCount = pointCloud.completed.vertices.x.length;
+        const scannedPercentage = (scannedCount / (scannedCount + completedCount)).toFixed(2);
+        const completedPercentage = (completedCount / (scannedCount + completedCount)).toFixed(2);
 
-        visualization.addPointCloud(pointCloud.completed, 'completedPoints');
+        visualization.addPointCloud(pointCloud.scanned, 'scanned-points');
+        visualization.addDetailsCategory('Total Points');
+        visualization.addDetails('Scanned points', `${scannedCount} (${scannedPercentage}%)`, 'scanned-points-details');
+        const scannedColorString = `rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`;
+        userInteraction.addInteraction('scanned-points', 'Scanned Points', scannedColorString);
+
+        visualization.addPointCloud(pointCloud.completed, 'completed-points');
+        visualization.addDetails('Completed points', `${completedCount} (${completedPercentage}%)`, 'completed-points-details');
         const completedColorString = `rgb(${Math.round(pointCloud.completed.color.r * 255)}, ${Math.round(pointCloud.completed.color.g * 255)}, ${Math.round(pointCloud.completed.color.b * 255)})`;
-        userInteraction.addInteraction('completedPoints', 'Completed Points', completedColorString);
+        userInteraction.addInteraction('completed-points', 'Completed Points', completedColorString);
 
         visualization.addSymmetryLines(symmetryLines, 'symmetryLines');
         userInteraction.addInteraction('symmetryLines', 'Symmetry Axes', '#444');
@@ -583,7 +624,7 @@ const visualMapping = (function initialize() {
         userInteraction.addInteraction('symmetryPlanes', 'Symmetry Planes', '#444');
 
         visualization.setScannedColor(scannedColorString);
-        visualization.setCompletedColor();
+        visualization.setCompletedColor(completedColorString);
         visualization.render();
     }
 

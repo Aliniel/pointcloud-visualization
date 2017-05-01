@@ -10,8 +10,12 @@
         <div id="main-wrapper"><!-- Canvas goes here --></div>
         <!-- Everything else is fixed -->
         <input id="file-input" type="file" name="file-input" value=""/>
-        <div id="tools-wrapper">
-            <p>Tools</p>
+        <div id="details-wrapper" class="info-wrapper">
+            <p class="info-title">Details</p>
+            <hr/>
+        </div>
+        <div id="tools-wrapper" class="info-wrapper">
+            <p class="info-title">Tools</p>
             <hr/>
             <ul>
                 <li id="axes" class="toggable"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>Coordinate Axes</li>
@@ -21,7 +25,7 @@
                         <input type="range" value="20" min="5" max="50"/><span>20</span>
                     </div>
                 </li>
-                <li id="refresh"><i class="fa fa-refresh" aria-hidden="true"></i>Reset Everything</li>
+                <li id="refresh"><i class="fa fa-refresh" aria-hidden="true"></i>Reset Highlight</li>
                 <!-- User interaction will be inserted here via JavaScript. -->
             </ul>
         </div>
