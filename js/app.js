@@ -313,6 +313,7 @@ const visualization = (function initialize() {
         });
 
         $detailsWrapper.find(`#${meshId}-details`).css('color', `${hexaColor}`);
+        render();
     }
 
     // Show or hide point cloud
