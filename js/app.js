@@ -35,10 +35,7 @@ const visualization = (function initialize() {
 
     // Cache DOM
     const $container = $('#main-wrapper');
-    const $toolsWrapper = $('#tools-wrapper');
     const $detailsWrapper = $('#details-wrapper');
-    const $scannedColor = $toolsWrapper.find('#scanned-color').find('i');
-    const $completedColor = $toolsWrapper.find('#completed-color').find('i');
     let $axesLabels;
 
     // --- Functions ---
@@ -84,13 +81,14 @@ const visualization = (function initialize() {
 
     // Draws the plane of symmetry
     // TODO: Add parameters for drawing the plane
-    function addSymmetryPlanes(planes, label) {
+    function addSymmetryPlanes(planes, label, hexColor) {
+        const color = `#${hexColor}`;
         const n = planes.width.length;
         for (let i = 0; i < n; i += 1) {
             // PlaneBufferGeometry: Width, Height
             const geometry = new THREE.PlaneBufferGeometry(planes.width[i], planes.height[i]);
             const material = new THREE.MeshBasicMaterial({
-                color: planes.color[i],
+                color: new THREE.Color(color),
                 transparent: true,
                 opacity: 0.15,
             });
@@ -105,11 +103,12 @@ const visualization = (function initialize() {
 
     // Draws the line of symmetry
     // TODO: Add parameters for drawing the line
-    function addSymmetryLines(lines, label) {
-        const n = lines.color.length;
+    function addSymmetryLines(lines, label, hexColor) {
+        const color = `#${hexColor}`;
+        const n = lines.start.x.length;
         for (let i = 0; i < n; i += 1) {
             const material = new THREE.LineBasicMaterial({
-                color: lines.color[i],
+                color: new THREE.Color(color),
             });
 
             const geometry = new THREE.Geometry();
@@ -290,15 +289,30 @@ const visualization = (function initialize() {
     }
 
     // Set color for the scanned pixels
-    function setScannedColor(color) {
-        $scannedColor.css('color', color);
+    function setScannedColor(hexColor) {
+        const color = `#${hexColor}`;
         $detailsWrapper.find('#scanned-points-details').css('color', color);
     }
 
     // Set color for the completed pixels
-    function setCompletedColor(color) {
-        $completedColor.css('color', color);
+    function setCompletedColor(hexColor) {
+        const color = `#${hexColor}`;
         $detailsWrapper.find('#completed-points-details').css('color', color);
+    }
+
+    // Change the color of a visual object
+    function changeColor(meshId, hexaColor) {
+        geometryCache[meshId].mesh.forEach((item) => {
+            const mesh = item;
+            if (mesh.material.color !== undefined) {
+                mesh.material.color = new THREE.Color(hexaColor);
+            } else {
+                mesh.material.uniforms.color.value = new THREE.Color(hexaColor);
+            }
+            mesh.material.needsUpdate = true;
+        });
+
+        $detailsWrapper.find(`#${meshId}-details`).css('color', `${hexaColor}`);
     }
 
     // Show or hide point cloud
@@ -427,6 +441,7 @@ const visualization = (function initialize() {
         clearScene,
         setScannedColor,
         setCompletedColor,
+        changeColor,
         toggleObjectVisibility,
         updateSelectionRegionSize,
         resetHighlight,
@@ -448,9 +463,9 @@ const userInteraction = (function initialize() {
     // --- Functions ---
     // Toggle point cloud visibility - called on click
     function toggleObject() {
-        visualization.toggleObjectVisibility($(this).attr('id'));
+        visualization.toggleObjectVisibility($(this).parent().attr('id'));
 
-        const $eye = $(this).find('i');
+        const $eye = $(this);
         if ($eye.hasClass('fa-eye')) {
             $eye.removeClass('fa-eye');
             $eye.addClass('fa-eye-slash');
@@ -460,12 +475,21 @@ const userInteraction = (function initialize() {
         }
     }
 
+    // Change the color mapping for visual objects
+    function changeColorMapping() {
+        const elementId = $(this).parent().prop('id');
+        visualization.changeColor(elementId, this.value);
+    }
+
     // Adds interactive elements for a given object to the Tools panel
-    function addInteraction(id, alias, color) {
-        $toolsWrapper.append(`<li id="${id}" class="toggable"><i class="fa fa-eye fa-2x" aria-hidden="true"></i>${alias}</li>`);
+    function addInteraction(id, alias, hexColor) {
+        $toolsWrapper.append(`<li id="${id}"><i class="fa fa-eye fa-2x toggable" aria-hidden="true"></i>${alias}<input type="color" value='#${hexColor}'/>
+</li>`);
         const $newElement = $toolsWrapper.find(`#${id}`);
-        $newElement.find('i').css('color', `${color}`);
-        $newElement.click(toggleObject);
+        $newElement.find('i').click(toggleObject);
+
+        const $colorPicker = $toolsWrapper.find('input[type="color"]');
+        $colorPicker.change(changeColorMapping);
     }
 
     // Clears the toolbox
@@ -517,8 +541,8 @@ const visualMapping = (function initialize() {
         y: [],
         z: [],
     };
-    pointCloud.completed.color = new THREE.Color(0.5, 0.5, 0);
-    pointCloud.scanned.color = new THREE.Color(0.5, 0, 0.5);
+    pointCloud.completed.color = new THREE.Color('#e74343');
+    pointCloud.scanned.color = new THREE.Color('#63bdf3');
 
     const symmetryLines = {};
     symmetryLines.start = {};
@@ -570,11 +594,6 @@ const visualMapping = (function initialize() {
             }
         }
 
-        symmetryLines.color = [
-            new THREE.Color(255, 255, 0),
-            new THREE.Color(255, 0, 255),
-            new THREE.Color(0, 255, 255),
-        ];
         symmetryLines.start.x = [-200, -120, -90];
         symmetryLines.start.y = [80, 180, 110];
         symmetryLines.start.z = [8, 10, 80];
@@ -584,7 +603,6 @@ const visualMapping = (function initialize() {
 
         symmetryPlanes.width = [200];
         symmetryPlanes.height = [200];
-        symmetryPlanes.color = [new THREE.Color(200, 200, 200)];
         symmetryPlanes.translationDistance = [100];
         symmetryPlanes.translationVector = [new THREE.Vector3(0, 1, 0.1)];
         symmetryPlanes.rotation = [new THREE.Euler(0, 1, 1.57)];
@@ -609,22 +627,20 @@ const visualMapping = (function initialize() {
         visualization.addPointCloud(pointCloud.scanned, 'scanned-points');
         visualization.addDetailsCategory('Total Points');
         visualization.addDetails('Scanned points', `${scannedCount} (${scannedPercentage}%)`, 'scanned-points-details');
-        const scannedColorString = `rgb(${Math.round(pointCloud.scanned.color.r * 255)}, ${Math.round(pointCloud.scanned.color.g * 255)}, ${Math.round(pointCloud.scanned.color.b * 255)})`;
-        userInteraction.addInteraction('scanned-points', 'Scanned Points', scannedColorString);
+        userInteraction.addInteraction('scanned-points', 'Scanned Points', pointCloud.scanned.color.getHexString());
 
         visualization.addPointCloud(pointCloud.completed, 'completed-points');
         visualization.addDetails('Completed points', `${completedCount} (${completedPercentage}%)`, 'completed-points-details');
-        const completedColorString = `rgb(${Math.round(pointCloud.completed.color.r * 255)}, ${Math.round(pointCloud.completed.color.g * 255)}, ${Math.round(pointCloud.completed.color.b * 255)})`;
-        userInteraction.addInteraction('completed-points', 'Completed Points', completedColorString);
+        userInteraction.addInteraction('completed-points', 'Completed Points', pointCloud.completed.color.getHexString());
 
-        visualization.addSymmetryLines(symmetryLines, 'symmetryLines');
-        userInteraction.addInteraction('symmetryLines', 'Symmetry Axes', '#444');
+        visualization.addSymmetryLines(symmetryLines, 'symmetryLines', '444444');
+        userInteraction.addInteraction('symmetryLines', 'Symmetry Axes', '444444');
 
-        visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes');
-        userInteraction.addInteraction('symmetryPlanes', 'Symmetry Planes', '#444');
+        visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes', '444444');
+        userInteraction.addInteraction('symmetryPlanes', 'Symmetry Planes', '444444');
 
-        visualization.setScannedColor(scannedColorString);
-        visualization.setCompletedColor(completedColorString);
+        visualization.setScannedColor(pointCloud.scanned.color.getHexString());
+        visualization.setCompletedColor(pointCloud.completed.color.getHexString());
         visualization.render();
     }
 

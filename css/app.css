@@ -35,10 +35,16 @@ div#main-wrapper {
 
 #details-wrapper span.details-label {
     font-style: italic;
+    font-weight: bold;
 }
 
 #tools-wrapper {
     right: 1em;
+}
+
+#tools-wrapper input[type="color"] {
+    float: right;
+    margin-left: 10px;
 }
 
 .info-wrapper > p.info-title {
