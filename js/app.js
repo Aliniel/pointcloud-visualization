@@ -374,7 +374,7 @@ const visualization = (function initialize() {
         });
 
         $detailsWrapper.find('#selected-points-details').parent().remove();
-        const highlightPercentage = (totalHighlighted / totalPoints).toFixed(2);
+        const highlightPercentage = ((totalHighlighted / totalPoints) * 100).toFixed(2);
         addDetails('Selected Points', `${totalHighlighted} (${highlightPercentage}%)`, 'selected-points-details');
     }
 
@@ -622,11 +622,13 @@ const visualMapping = (function initialize() {
 
         const scannedCount = pointCloud.scanned.vertices.x.length;
         const completedCount = pointCloud.completed.vertices.x.length;
-        const scannedPercentage = (scannedCount / (scannedCount + completedCount)).toFixed(2);
-        const completedPercentage = (completedCount / (scannedCount + completedCount)).toFixed(2);
+        const scannedPercentage = ((scannedCount / (scannedCount + completedCount)) * 100).toFixed(2);
+        const completedPercentage = ((completedCount / (scannedCount + completedCount)) * 100).toFixed(2);
 
         visualization.addPointCloud(pointCloud.scanned, 'scanned-points');
-        visualization.addDetailsCategory('Total Points');
+        visualization.addDetailsCategory('Point Cloud');
+        visualization.addDetails('Total points', `${scannedCount + completedCount} (100%)`, 'total-points-details');
+    
         visualization.addDetails('Scanned points', `${scannedCount} (${scannedPercentage}%)`, 'scanned-points-details');
         userInteraction.addInteraction('scanned-points', 'Scanned Points', pointCloud.scanned.color.getHexString());
 
