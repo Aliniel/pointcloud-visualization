@@ -25,7 +25,7 @@
                         <input type="range" value="20" min="5" max="50"/><span>20</span>
                     </div>
                 </li>
-                <li id="refresh"><i class="fa fa-refresh" aria-hidden="true"></i>Reset Highlight</li>
+                <li id="refresh"><i class="fa fa-refresh fa-2x" aria-hidden="true"></i>Reset Highlight</li>
                 <!-- User interaction will be inserted here via JavaScript. -->
             </ul>
         </div>
@@ -35,26 +35,37 @@
         <script src="js/OrbitControls.js"></script>
         <script src="js/app.js"></script>
 		<script type="x-shader/x-vertex" id="vertexshader">
-			attribute float size;
+            attribute float size;
             attribute float alpha;
+            attribute vec3 colors;
 
-			varying float vAlpha;
-			void main() {
+            varying float vAlpha;
+            varying vec3 vColor;
+            void main() {
                 vAlpha = alpha;
 
-				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-				gl_PointSize = size * ( 300.0 / -mvPosition.z );
-				gl_Position = projectionMatrix * mvPosition;
-			}
+                #ifdef USE_COLOR
+                    vColor = colors;
+                #endif
+
+                vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                gl_PointSize = size * ( 300.0 / -mvPosition.z );
+                gl_Position = projectionMatrix * mvPosition;
+            }
 		</script>
 
 		<script type="x-shader/x-fragment" id="fragmentshader">
-			uniform vec3 color;
+            uniform vec3 unicolor;
 
+            varying vec3 vColor;
             varying float vAlpha;
-			void main() {
-				gl_FragColor = vec4(color, vAlpha);
-			}
+            void main() {
+                #ifdef USE_COLOR
+                    gl_FragColor = vec4(vColor, vAlpha);
+                #else
+                    gl_FragColor = vec4(unicolor, vAlpha);
+                #endif
+            }
 		</script>
 
     </body>
