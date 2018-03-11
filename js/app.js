@@ -756,34 +756,39 @@ const visualMapping = (function initialize() {
 }());
 
 // --- Module for managing data ---
-const dataManager = (function initialize() {
+(function initialize() {
     // --- Attributes ---
-    // Object containing all vertexes
-    const vertexes = {};
-    vertexes.x = [];
-    vertexes.y = [];
-    vertexes.z = [];
+    const supportedFormats = [
+        'ply',
+        'off',
+    ];
+    // Object containing all vertices
+    const vertices = {};
+    vertices.x = [];
+    vertices.y = [];
+    vertices.z = [];
 
     // --- Cache DOM ---
     const $fileInput = $('input[type="file"]');
 
-    // Parse loaded PLY file
-    function parseData(content) {
-        const lines = content.split('\n');
-        let vertexCount;
+    /**
+     * Empty the arrays containing the vertices.
+     */
+    function emptyVertices() {
+        vertices.x = [];
+        vertices.y = [];
+        vertices.z = [];
+    }
 
-        // --- Parse header ---
-        // Check is the file is ply
-        let lineIndex = 0;
-        let line = lines[lineIndex];
-        if (line !== 'ply') {
-            alert('Unsupported file!');
-            return;
-        }
-
+    /**
+     * Ply file parser. Fills the vertices object of x, y, z coordinates.
+     * @param {string[]} lines Array of strings read from the file.
+     */
+    function loadPly(lines) {
         // Check if ply file is in ascii format
-        lineIndex += 1;
-        line = lines[lineIndex];
+        let vertexCount;
+        let lineIndex = 1;
+        let line = lines[lineIndex];
         if (line.indexOf('ascii') < 0) {
             alert('Only ASCII PLY files are supported!');
             return;
@@ -802,25 +807,66 @@ const dataManager = (function initialize() {
         }
         lineIndex += 1;
 
-        // Empty existing vertexes
-        vertexes.x = [];
-        vertexes.y = [];
-        vertexes.z = [];
-        vertexes.confidence = [];
-        vertexes.intensity = [];
+        emptyVertices();
+        vertices.confidence = [];
+        vertices.intensity = [];
 
-        // Parse vertexes
+        // Parse vertices
         for (let i = 0; i < vertexCount; i += 1) {
             const [x, y, z, confidence, intensity] = lines[lineIndex + i].split(' ');
-            vertexes.x.push(x);
-            vertexes.y.push(y);
-            vertexes.z.push(z);
-            vertexes.confidence.push(confidence);
-            vertexes.intensity.push(intensity);
+            vertices.x.push(parseFloat(x));
+            vertices.y.push(parseFloat(y));
+            vertices.z.push(parseFloat(z));
+            vertices.confidence.push(confidence);
+            vertices.intensity.push(intensity);
+        }
+    }
+
+    /**
+     * OFF file format parser. Reads x, y, z vertices into the vertices object.
+     * @param {string[]} lines Array of string data lines read from the file.
+     */
+    function loadOff(lines) {
+        let index = 1;
+
+        // Skip possible comments and empty lines
+        const dataStartRe = new RegExp(/^(\d)+ (\d)+ (\d)+.*$/);
+        while (!lines[index].match(dataStartRe)) {
+            index += 1;
+        }
+
+        // Read the complete number of points, faces and edges
+        const [pointCount] = lines[index].split(' ').map(value => parseInt(value, 10));
+        index += 1;
+
+        emptyVertices();
+
+        // Load the points
+        for (index; index < pointCount; index += 1) {
+            const [x, y, z] = lines[index].split(' ');
+            vertices.x.push(parseFloat(x));
+            vertices.y.push(parseFloat(y));
+            vertices.z.push(parseFloat(z));
+        }
+    }
+
+    // Parse loaded file
+    function parseData(content) {
+        const lines = content.split('\n');
+
+        // --- Parse header ---
+        // Check is the file is ply
+        const fileFormatLine = lines[0];
+        if (fileFormatLine === 'ply') {
+            loadPly(lines);
+        } else if (fileFormatLine.toLowerCase() === 'off') {
+            loadOff(lines);
+        } else {
+            alert(`Unsupported file type. Please use one of the following formats: ${supportedFormats.toString()}`);
         }
 
         // Draw the data
-        visualMapping.fillPointCloud(vertexes);
+        visualMapping.fillPointCloud(vertices);
     }
 
     // Read file content
