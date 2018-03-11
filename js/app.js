@@ -21,6 +21,11 @@ const visualization = (function initialize() {
     const geometryCache = {};
     const persistantGeometries = [];
     const dataGeometries = [];
+    const geometryTypes = {
+        points: 'points',
+        axis: 'axis',
+        plane: 'plane',
+    };
 
     const axesValueLabels = [];
 
@@ -31,6 +36,7 @@ const visualization = (function initialize() {
     // Adjustable variables
     let selectionRegion = 20.0;
     let selectedPoint;
+    const dataRange = 200;
 
     // Cache DOM
     const $container = $('#main-wrapper');
@@ -63,12 +69,18 @@ const visualization = (function initialize() {
         $detailsWrapper.find('p:not(.info-title)').remove();
     }
 
-    // Saves geometry
-    function saveGeometry(label, geometry) {
+    /**
+     * Save geometry for later use.
+     * @param {string} label Unique string key for the geometry.
+     * @param {Object} geometry Three.js geometry object.
+     * @param {string} type Type of the geometry. Enum value from the geometryTypes.
+     */
+    function saveGeometry(label, geometry, type) {
         if (!geometryCache[label]) {
             geometryCache[label] = {
                 mesh: [],
                 visible: true,
+                type,
             };
         }
         geometryCache[label].mesh.push(geometry);
@@ -97,7 +109,7 @@ const visualization = (function initialize() {
             plane.rotation = planes.rotation[i];
             plane.translateOnAxis(planes.translationVector[i], planes.translationDistance[i]);
 
-            saveGeometry(label, plane);
+            saveGeometry(label, plane, geometryTypes.plane);
         }
     }
 
@@ -119,7 +131,7 @@ const visualization = (function initialize() {
             const line = new THREE.Line(geometry, material);
             scene.add(line);
 
-            saveGeometry(label, line);
+            saveGeometry(label, line, geometryTypes.axis);
         }
     }
 
@@ -181,7 +193,7 @@ const visualization = (function initialize() {
             sphere.translateZ(i);
         }
 
-        saveGeometry('axes', sphere);
+        saveGeometry('axes', sphere, geometryTypes.axis);
 
         const text = createText();
         text.setHTML(i.toString());
@@ -192,7 +204,7 @@ const visualization = (function initialize() {
 
     // Adds axes to the scene
     function createAxes() {
-        const axesLength = 200;
+        const axesLength = dataRange;
         const axesColor = new THREE.Color(1, 1, 1);
 
         const axesStart = [
@@ -225,7 +237,7 @@ const visualization = (function initialize() {
             const line = new THREE.Line(geometry, material);
             scene.add(line);
 
-            saveGeometry('axes', line);
+            saveGeometry('axes', line, geometryTypes.axis);
         }
 
         // Draw axes values
@@ -236,7 +248,14 @@ const visualization = (function initialize() {
         }
     }
 
-    // Prints the point cloud data
+    /**
+     * Add point cloud to the visualization.
+     * @param {Object} pointCloudData Contains three attributes (x, y, z) with array
+     * of float numbers (point coordinates).
+     * @param {string} label Label of the Point Cloud.
+     * @param {number} alphaVal A float number indicating the alpha value for
+     * the color of the points.
+     */
     function addPointCloud(pointCloudData, label, alphaVal = 0.8) {
         const geometry = new THREE.BufferGeometry();
 
@@ -245,11 +264,32 @@ const visualization = (function initialize() {
         const positions = new Float32Array(n * 3);
         const sizes = new Float32Array(n);
 
+        // Normalization params
+        const min = Math.min(
+            ...pointCloudData.vertices.x,
+            ...pointCloudData.vertices.y,
+            ...pointCloudData.vertices.z,
+        );
+        const max = Math.max(
+            ...pointCloudData.vertices.x,
+            ...pointCloudData.vertices.y,
+            ...pointCloudData.vertices.z,
+        );
+        const range = max - min;
+        /**
+         * Normalize the value to the range of [0, 1]. Min and max will be used from above.
+         * @param {numeric} value Value to be normalized.
+         */
+        const normalize = value => (value - min) / range;
+
+        const multiplier = dataRange * 2;
+        const reducer = dataRange / 2;
         for (let i = 0; i < n; i += 1) {
             const vertex = new THREE.Vector3(
-                pointCloudData.vertices.x[i] * 1000,
-                pointCloudData.vertices.y[i] * 1000,
-                pointCloudData.vertices.z[i] * 1000);
+                (normalize(pointCloudData.vertices.x[i]) * multiplier) - reducer,
+                (normalize(pointCloudData.vertices.y[i]) * multiplier) - reducer,
+                (normalize(pointCloudData.vertices.z[i]) * multiplier) - reducer,
+            );
             vertex.toArray(positions, i * 3);
 
             alpha[i] = alphaVal;
@@ -291,7 +331,7 @@ const visualization = (function initialize() {
         const pointCloud = new THREE.Points(geometry, materials);
         scene.add(pointCloud);
 
-        saveGeometry(label, pointCloud);
+        saveGeometry(label, pointCloud, geometryTypes.points);
     }
 
     // Clear the scene
@@ -350,10 +390,16 @@ const visualization = (function initialize() {
         // Traverse all points - scanned, completed...
         let totalPoints = 0;
         let totalHighlighted = 0;
-        let objects = geometryCache['scanned-points'].mesh;
-        for (let i = 0; i < 5; i += 1) {
-            objects = objects.concat(geometryCache[`completed-points-${i}`].mesh);
-        }
+        let objects;
+        Object.keys(geometryCache).forEach((key) => {
+            if (geometryCache[key].type === geometryTypes.points) {
+                if (objects === undefined) {
+                    objects = geometryCache[key].mesh;
+                } else {
+                    objects = objects.concat(geometryCache[key].mesh);
+                }
+            }
+        });
         objects.forEach((object) => {
             // Get all geometry Attributes and set new values
             const positions = object.geometry.attributes.position;
@@ -397,10 +443,16 @@ const visualization = (function initialize() {
         raycaster.setFromCamera(mouse, camera);
 
         // Points to check intersection with
-        let points = geometryCache['scanned-points'].mesh;
-        for (let i = 0; i < 5; i += 1) {
-            points = points.concat(geometryCache[`completed-points-${i}`].mesh);
-        }
+        let points;
+        Object.keys(geometryCache).forEach((key) => {
+            if (geometryCache[key].type === geometryTypes.points) {
+                if (points === undefined) {
+                    points = geometryCache[key].mesh;
+                } else {
+                    points = points.concat(geometryCache[key].mesh);
+                }
+            }
+        });
         const intersects = raycaster.intersectObjects(points);
 
         if (intersects.length > 0) {
@@ -456,6 +508,7 @@ const visualization = (function initialize() {
         addDetailsCategory,
         addDetails,
         clearDetails,
+        geometryTypes,
     };
 }());
 
@@ -551,8 +604,14 @@ const userInteraction = (function initialize() {
 const visualMapping = (function initialize() {
     // --- Attributes ---
     const pointCloud = {};
-    // Points completed by algorithm - simulation for now
-    pointCloud.completed = [];
+
+    // Points completed by algorithm
+    pointCloud.completed = {};
+    pointCloud.completed.vertices = {
+        x: [],
+        y: [],
+        z: [],
+    };
 
     // Scanned points
     pointCloud.scanned = {};
@@ -562,17 +621,17 @@ const visualMapping = (function initialize() {
         z: [],
     };
 
-    // Scanned points which were moved and marked as completed for error calculation
-    pointCloud.all = {};
-    pointCloud.all.vertices = {
-        x: [],
-        y: [],
-        z: [],
-    };
+    // // Scanned points which were moved and marked as completed for error calculation
+    // pointCloud.all = {};
+    // pointCloud.all.vertices = {
+    //     x: [],
+    //     y: [],
+    //     z: [],
+    // };
 
-    // pointCloud.completed.color = new THREE.Color('#e74343');
+    pointCloud.completed.color = new THREE.Color('#e74343');
     pointCloud.scanned.color = new THREE.Color('#63bdf3');
-    pointCloud.all.color = new THREE.Color('#aaaaaa');
+    // pointCloud.all.color = new THREE.Color('#aaaaaa');
 
     const symmetryLines = {};
     symmetryLines.start = {};
@@ -679,79 +738,91 @@ const visualMapping = (function initialize() {
         symmetryPlanes.rotation = [new THREE.Euler(0, 1, 1.57)];
     }
 
-    // Fill the point cloud with data
-    function fillPointCloud(vertexes) {
-        pointCloud.x = vertexes.x;
-        pointCloud.y = vertexes.y;
-        pointCloud.z = vertexes.z;
-
-        // Get the synthetic data
-        genSyntheticData(vertexes);
+    /**
+     * Start a new visualization of the point cloud.
+     * @param {Object} vertices Object containing three attributes of x, y and z
+     * coordinate arrays of float numbers. These will be displayed as a "scanned"
+     * or "ground truth" points.
+     */
+    function startNewVisualization(vertices) {
+        // Clear the previous visualization
+        // genSyntheticData(vertices);
         visualization.clearScene();
         visualization.clearDetails();
         userInteraction.clearToolbox();
 
-        // Calculate details for the summary details
+        pointCloud.scanned.vertices.x = vertices.x;
+        pointCloud.scanned.vertices.y = vertices.y;
+        pointCloud.scanned.vertices.z = vertices.z;
+
+        // Init the visualization
         const scannedCount = pointCloud.scanned.vertices.x.length;
-        let completedCount = 0;
-        pointCloud.completed.forEach((points) => {
-            completedCount += points.vertices.x.length;
-        });
-
-        const scannedPercentage =
-            ((scannedCount / (scannedCount + completedCount)) * 100).toFixed(2);
-        const completedPercentage =
-            ((completedCount / (scannedCount + completedCount)) * 100).toFixed(2);
-
-        // Add Summary details
         visualization.addPointCloud(pointCloud.scanned, 'scanned-points');
         visualization.addDetailsCategory('Point Cloud Summary');
-        visualization.addDetails('Total points', `${scannedCount + completedCount} (100%)`, 'total-points-details');
-        visualization.addDetails('Scanned points', `${scannedCount} (${scannedPercentage}%)`, 'scanned-points-details');
-        visualization.addDetails('Completed points', `${completedCount} (${completedPercentage}%)`, 'completed-points-details');
+        visualization.addDetails('Total points', `${scannedCount} (100%)`, 'total-points-details');
+        visualization.addDetails('Scanned points', `${scannedCount} (100%)`, 'scanned-points-details');
 
         userInteraction.addInteraction('scanned-points', 'Scanned Points', pointCloud.scanned.color.getHexString());
 
-        // Add completeness heat map
-        visualization.addDetailsCategory('Completeness Accuracy Heat Map');
-        let currentCompleted = 0;
-        pointCloud.completed.forEach((points) => {
-            const pointdId = `completed-points-${currentCompleted}`;
-            const pointLabel = `Completed (Error: [${currentCompleted * 20}, ${(currentCompleted + 1) * 20}]%)`;
-            visualization.addPointCloud(points, pointdId);
-            visualization.addDetails(
-                pointLabel,
-                `${points.vertices.x.length} (${((points.vertices.x.length / (scannedCount + completedCount)) * 100).toFixed(2)}%)`,
-                `${pointdId}-details`,
-                colorTresholds[currentCompleted]);
-            userInteraction.addInteraction(
-                pointdId,
-                pointLabel,
-                colorTresholds[currentCompleted],
-                true,
-                false);
-            currentCompleted += 1;
-        });
+        // // Calculate details for the summary details
+        // const scannedCount = pointCloud.scanned.vertices.x.length;
+        // let completedCount = 0;
+        // pointCloud.completed.forEach((points) => {
+        //     completedCount += points.vertices.x.length;
+        // });
 
-        // Add point clouds to the scene
-        visualization.addPointCloud(pointCloud.all, 'all-points', 0.4);
-        userInteraction.addInteraction('all-points', 'All Points', pointCloud.all.color.getHexString(), false);
-        visualization.toggleObjectVisibility('all-points');
+        // const scannedPercentage =
+        //     ((scannedCount / (scannedCount + completedCount)) * 100).toFixed(2);
+        // const completedPercentage =
+        //     ((completedCount / (scannedCount + completedCount)) * 100).toFixed(2);
 
-        // Add lines
-        visualization.addSymmetryLines(symmetryLines, 'symmetryLines', '444444');
-        userInteraction.addInteraction('symmetryLines', 'Symmetry Axes', '444444');
+        // // Add Summary details
+        // visualization.addPointCloud(pointCloud.scanned, 'scanned-points');
+        // visualization.addDetailsCategory('Point Cloud Summary');
+        // visualization.addDetails('Total points', `${scannedCount + completedCount} (100%)`, 'total-points-details');
+        // visualization.addDetails('Scanned points', `${scannedCount} (${scannedPercentage}%)`, 'scanned-points-details');
+        // visualization.addDetails('Completed points', `${completedCount} (${completedPercentage}%)`, 'completed-points-details');
 
-        // Add planes
-        visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes', '444444');
-        userInteraction.addInteraction('symmetryPlanes', 'Symmetry Planes', '444444');
+        // // Add completeness heat map
+        // visualization.addDetailsCategory('Completeness Accuracy Heat Map');
+        // let currentCompleted = 0;
+        // pointCloud.completed.forEach((points) => {
+        //     const pointdId = `completed-points-${currentCompleted}`;
+        //     const pointLabel = `Completed (Error: [${currentCompleted * 20}, ${(currentCompleted + 1) * 20}]%)`;
+        //     visualization.addPointCloud(points, pointdId);
+        //     visualization.addDetails(
+        //         pointLabel,
+        //         `${points.vertices.x.length} (${((points.vertices.x.length / (scannedCount + completedCount)) * 100).toFixed(2)}%)`,
+        //         `${pointdId}-details`,
+        //         colorTresholds[currentCompleted]);
+        //     userInteraction.addInteraction(
+        //         pointdId,
+        //         pointLabel,
+        //         colorTresholds[currentCompleted],
+        //         true,
+        //         false);
+        //     currentCompleted += 1;
+        // });
+
+        // // Add point clouds to the scene
+        // visualization.addPointCloud(pointCloud.all, 'all-points', 0.4);
+        // userInteraction.addInteraction('all-points', 'All Points', pointCloud.all.color.getHexString(), false);
+        // visualization.toggleObjectVisibility('all-points');
+
+        // // Add lines
+        // visualization.addSymmetryLines(symmetryLines, 'symmetryLines', '444444');
+        // userInteraction.addInteraction('symmetryLines', 'Symmetry Axes', '444444');
+
+        // // Add planes
+        // visualization.addSymmetryPlanes(symmetryPlanes, 'symmetryPlanes', '444444');
+        // userInteraction.addInteraction('symmetryPlanes', 'Symmetry Planes', '444444');
 
         visualization.render();
     }
 
     // --- Reveal public methods ---
     return {
-        fillPointCloud,
+        startNewVisualization,
     };
 }());
 
@@ -866,7 +937,7 @@ const visualMapping = (function initialize() {
         }
 
         // Draw the data
-        visualMapping.fillPointCloud(vertices);
+        visualMapping.startNewVisualization(vertices);
     }
 
     // Read file content
