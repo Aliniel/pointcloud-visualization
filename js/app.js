@@ -37,6 +37,9 @@ const visualization = (function initialize() {
     let selectionRegion = 20.0;
     let selectedPoint;
     const dataRange = 200;
+    // Highlight parameters
+    const fadedAlpha = 0.2;
+    const highlightedAlpha = 0.8;
 
     // Cache DOM
     const $container = $('#main-wrapper');
@@ -403,10 +406,6 @@ const visualization = (function initialize() {
 
     // Highlight area around a point
     function highlightArea(pointPosition) {
-        // Highlight parameters
-        const fadedAlpha = 0.2;
-        const highlightedAlpha = 0.8;
-
         // Traverse all points - scanned, completed...
         let totalPoints = 0;
         let totalHighlighted = 0;
@@ -501,13 +500,16 @@ const visualization = (function initialize() {
         const meshes = getCachedMesh(geometryTypes.points);
         meshes.forEach((mesh) => {
             const points = mesh.geometry.attributes.position;
+            const alphas = mesh.geometry.attributes.alpha;
             const n = points.count;
 
             // Traverse all points
-            for (let i = 0; i < n; i += 3) {
-                selectedPoints.x.push(points.array[i]);
-                selectedPoints.y.push(points.array[i + 1]);
-                selectedPoints.z.push(points.array[i + 2]);
+            for (let i = 0; i < n; i += 1) {
+                if (alphas.array[i].toFixed(2) === highlightedAlpha.toFixed(2)) {
+                    selectedPoints.x.push(points.array[i * 3]);
+                    selectedPoints.y.push(points.array[(i * 3) + 1]);
+                    selectedPoints.z.push(points.array[(i * 3) + 2]);
+                }
             }
         });
 
@@ -991,6 +993,62 @@ const visualMapping = (function initialize() {
  * Server communication module.
  */
 const communicator = (function init() {
+    let filename;
+
+    /**
+     * Get the results of the completion tool.
+     */
+    function getResults() {
+        const searchParams = new URLSearchParams();
+        searchParams.append('task', 'get_results');
+        searchParams.append('filename', filename);
+
+        fetch('scripts/complete.cgi', {
+            method: 'POST',
+            body: searchParams,
+            headers: new Headers({
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }),
+        })
+        .then(response => response.json())
+        .catch(error => console.log('Error checking progress: ', error))
+        .then((responseData) => {
+            console.log(responseData.data);
+        });
+    }
+
+    /**
+     * Periodically sends requests to the server to check on the progress of the completion.
+     */
+    function checkProgress() {
+        const searchParams = new URLSearchParams();
+        searchParams.append('task', 'progress');
+        searchParams.append('filename', filename);
+
+        let timer;
+        const updateProgress = () => {
+            fetch('scripts/complete.cgi', {
+                method: 'POST',
+                body: searchParams,
+                headers: new Headers({
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }),
+            })
+            .then(response => response.json())
+            .catch(error => console.log('Error checking progress: ', error))
+            .then((responseData) => {
+                const progress = responseData.progress;
+                console.log(progress);
+                if (parseInt(progress, 10) >= 100) {
+                    clearTimeout(timer);
+                    getResults();
+                } else {
+                    timer = setTimeout(updateProgress, 5000);
+                }
+            });
+        };
+        timer = setTimeout(updateProgress, 5000);
+    }
     /**
      * Send the current selection to the server to be automatically completed.
      */
@@ -1001,7 +1059,9 @@ const communicator = (function init() {
         }
 
         const searchParams = new URLSearchParams();
+        searchParams.append('task', 'submit');
         searchParams.append('data', JSON.stringify(data));
+
         fetch('scripts/complete.cgi', {
             method: 'POST',
             body: searchParams,
@@ -1012,7 +1072,10 @@ const communicator = (function init() {
         .then(response => response.json())
         .catch(error => console.log('Error fetching data: ', error))
         .then((responseData) => {
-            console.log(responseData);
+            if (responseData.status === 'ok') {
+                filename = responseData.filename;
+                checkProgress();
+            }
         });
     }
 
