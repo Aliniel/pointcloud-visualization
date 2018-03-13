@@ -254,7 +254,8 @@ const visualization = (function initialize() {
     /**
      * Add point cloud to the visualization.
      * @param {Object} pointCloudData Contains three attributes (x, y, z) with array
-     * of float numbers (point coordinates).
+     * of float numbers (point coordinates). Optionally can contain "normalize" value set to true
+     * if normalization is required.
      * @param {string} label Label of the Point Cloud.
      * @param {number} alphaVal A float number indicating the alpha value for
      * the color of the points.
@@ -288,11 +289,20 @@ const visualization = (function initialize() {
         const multiplier = dataRange * 2;
         const reducer = dataRange / 2;
         for (let i = 0; i < n; i += 1) {
-            const vertex = new THREE.Vector3(
-                (normalize(pointCloudData.vertices.x[i]) * multiplier) - reducer,
-                (normalize(pointCloudData.vertices.y[i]) * multiplier) - reducer,
-                (normalize(pointCloudData.vertices.z[i]) * multiplier) - reducer,
-            );
+            let vertex;
+            if (pointCloudData.normalize) {
+                vertex = new THREE.Vector3(
+                    (normalize(pointCloudData.vertices.x[i]) * multiplier) - reducer,
+                    (normalize(pointCloudData.vertices.y[i]) * multiplier) - reducer,
+                    (normalize(pointCloudData.vertices.z[i]) * multiplier) - reducer,
+                );
+            } else {
+                vertex = new THREE.Vector3(
+                    pointCloudData.vertices.x[i],
+                    pointCloudData.vertices.y[i],
+                    pointCloudData.vertices.z[i],
+                );
+            }
             vertex.toArray(positions, i * 3);
 
             alpha[i] = alphaVal;
@@ -638,12 +648,7 @@ const visualMapping = (function initialize() {
     const pointCloud = {};
 
     // Points completed by algorithm
-    pointCloud.completed = {};
-    pointCloud.completed.vertices = {
-        x: [],
-        y: [],
-        z: [],
-    };
+    pointCloud.completed = [];
 
     // Scanned points
     pointCloud.scanned = {};
@@ -786,6 +791,7 @@ const visualMapping = (function initialize() {
         pointCloud.scanned.vertices.x = vertices.x;
         pointCloud.scanned.vertices.y = vertices.y;
         pointCloud.scanned.vertices.z = vertices.z;
+        pointCloud.scanned.normalize = true;
 
         // Init the visualization
         const scannedCount = pointCloud.scanned.vertices.x.length;
@@ -852,35 +858,66 @@ const visualMapping = (function initialize() {
         visualization.render();
     }
 
+    /**
+     * Adds new points into an existing visualization.
+     * @param {Object} vertices Object containing three attributes of x, y and z
+     * coordinate arrays of float numbers. These will be displayed as a "scanned"
+     * or "ground truth" points.
+     */
+    function addPointsToVisualization(vertices) {
+        const id = pointCloud.completed.length;
+        const count = vertices.x.length;
+        const cloudId = `completed-points-${id}`;
+        const cloudLabel = `Completed Point Set #${id}`;
+        const cloudColor = colorTresholds[0];
+
+        const completed = {
+            vertices,
+            colors: () => vertices.x.map(() => cloudColor),
+        };
+        pointCloud.completed.push(completed);
+
+        // Init the visualization
+        visualization.addPointCloud(completed, cloudId);
+        userInteraction.addInteraction(cloudId, cloudLabel, cloudColor, true, false);
+        visualization.addDetails(
+            cloudLabel,
+            `${count}`,
+            `${cloudId}-details`,
+            cloudColor,
+        );
+
+        visualization.render();
+    }
+
     // --- Reveal public methods ---
     return {
         startNewVisualization,
+        addPointsToVisualization,
     };
 }());
 
 // --- Module for managing data ---
-(function initialize() {
+const dataManager = (function initialize() {
     // --- Attributes ---
     const supportedFormats = [
         'ply',
         'off',
     ];
-    // Object containing all vertices
-    const vertices = {};
-    vertices.x = [];
-    vertices.y = [];
-    vertices.z = [];
 
     // --- Cache DOM ---
     const $fileInput = $('input[type="file"]');
 
     /**
-     * Empty the arrays containing the vertices.
+     * Get an empty container to store points into.
      */
-    function emptyVertices() {
+    function getEmptyContainer() {
+        // Object containing all vertices
+        const vertices = {};
         vertices.x = [];
         vertices.y = [];
         vertices.z = [];
+        return vertices;
     }
 
     /**
@@ -892,10 +929,6 @@ const visualMapping = (function initialize() {
         let vertexCount;
         let lineIndex = 1;
         let line = lines[lineIndex];
-        if (line.indexOf('ascii') < 0) {
-            alert('Only ASCII PLY files are supported!');
-            return;
-        }
 
         // Parse rest of the header
         lineIndex += 1;
@@ -910,7 +943,7 @@ const visualMapping = (function initialize() {
         }
         lineIndex += 1;
 
-        emptyVertices();
+        const vertices = getEmptyContainer();
         vertices.confidence = [];
         vertices.intensity = [];
 
@@ -923,6 +956,7 @@ const visualMapping = (function initialize() {
             vertices.confidence.push(confidence);
             vertices.intensity.push(intensity);
         }
+        return vertices;
     }
 
     /**
@@ -942,7 +976,7 @@ const visualMapping = (function initialize() {
         const [pointCount] = lines[index].split(' ').map(value => parseInt(value, 10));
         index += 1;
 
-        emptyVertices();
+        const vertices = getEmptyContainer();
 
         // Load the points
         for (index; index < pointCount; index += 1) {
@@ -951,25 +985,29 @@ const visualMapping = (function initialize() {
             vertices.y.push(parseFloat(y));
             vertices.z.push(parseFloat(z));
         }
+        return vertices;
     }
 
-    // Parse loaded file
+    /**
+     * Parse contents of a file and return vertices to work with.
+     * @param {string} content String content of a whole file.
+     */
     function parseData(content) {
         const lines = content.split('\n');
 
         // --- Parse header ---
         // Check is the file is ply
         const fileFormatLine = lines[0];
+        let vertices;
         if (fileFormatLine === 'ply') {
-            loadPly(lines);
+            vertices = loadPly(lines);
         } else if (fileFormatLine.toLowerCase() === 'off') {
-            loadOff(lines);
+            vertices = loadOff(lines);
         } else {
             alert(`Unsupported file type. Please use one of the following formats: ${supportedFormats.toString()}`);
         }
 
-        // Draw the data
-        visualMapping.startNewVisualization(vertices);
+        return vertices;
     }
 
     // Read file content
@@ -978,7 +1016,9 @@ const visualMapping = (function initialize() {
 
         // Process the read content
         reader.onload = (e) => {
-            parseData(e.target.result);
+            const vertices = parseData(e.target.result);
+            // Draw the data
+            visualMapping.startNewVisualization(vertices);
         };
 
         // Read
@@ -987,6 +1027,11 @@ const visualMapping = (function initialize() {
 
     // --- Bindings ---
     $fileInput.change(readContent);
+
+    // Public
+    return {
+        parseData,
+    };
 }());
 
 /**
@@ -1013,7 +1058,8 @@ const communicator = (function init() {
         .then(response => response.json())
         .catch(error => console.log('Error checking progress: ', error))
         .then((responseData) => {
-            console.log(responseData.data);
+            const vertices = dataManager.parseData(responseData.data);
+            visualMapping.addPointsToVisualization(vertices);
         });
     }
 
@@ -1079,8 +1125,9 @@ const communicator = (function init() {
         });
     }
 
-    // TODO: Bind to a button
+    // TODO: Bind to a button, remove getResults
     return {
         complete,
+        getResults,
     };
 }());

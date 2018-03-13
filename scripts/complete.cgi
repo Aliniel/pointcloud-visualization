@@ -8,9 +8,7 @@ import cgi
 import json
 import random
 import os
-import subprocess
 import string
-import sys
 
 TOOL_PATH = '/media/bmakan/dev-space/computer-vision/semestral-project/cmake-build-debug/SymmetryDetection3D'
 
@@ -20,7 +18,6 @@ def run_completion(filename):
     Run the Automatic 3D Completion Tool on a given file.
     '''
     os.system('bash -c "batch <<< \\"%s %s\\""' % (TOOL_PATH, os.path.abspath(filename)))
-    # subprocess.Popen([TOOL_PATH, os.path.abspath(filename)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
 
 
 def get_output_file_name():
@@ -79,7 +76,7 @@ def handle_request():
         results_file = open('data/%s.complete' % filename)
         response = {
             'status': 'ok',
-            'progress': ''.join(results_file.readlines()),
+            'data': ''.join(results_file.readlines()),
         }
         results_file.close()
         print(json.dumps(response))
