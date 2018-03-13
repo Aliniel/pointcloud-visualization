@@ -381,6 +381,26 @@ const visualization = (function initialize() {
         render();
     }
 
+    /**
+     * Returns cached meshes by type.
+     * @param {string} type Type of mesh to return. Use enum geometryType.
+     * @return {Object[]} Array of Three.js meshes.
+     */
+    function getCachedMesh(type) {
+        let objects;
+        Object.keys(geometryCache).forEach((key) => {
+            if (geometryCache[key].type === type) {
+                if (objects === undefined) {
+                    objects = geometryCache[key].mesh;
+                } else {
+                    objects = objects.concat(geometryCache[key].mesh);
+                }
+            }
+        });
+
+        return objects;
+    }
+
     // Highlight area around a point
     function highlightArea(pointPosition) {
         // Highlight parameters
@@ -390,16 +410,7 @@ const visualization = (function initialize() {
         // Traverse all points - scanned, completed...
         let totalPoints = 0;
         let totalHighlighted = 0;
-        let objects;
-        Object.keys(geometryCache).forEach((key) => {
-            if (geometryCache[key].type === geometryTypes.points) {
-                if (objects === undefined) {
-                    objects = geometryCache[key].mesh;
-                } else {
-                    objects = objects.concat(geometryCache[key].mesh);
-                }
-            }
-        });
+        const objects = getCachedMesh(geometryTypes.points);
         objects.forEach((object) => {
             // Get all geometry Attributes and set new values
             const positions = object.geometry.attributes.position;
@@ -409,6 +420,8 @@ const visualization = (function initialize() {
             totalPoints += n;
             for (let i = 0; i < n; i += 1) {
                 const j = i * 3;
+
+                // Position of one point
                 const position = new THREE.Vector3(
                     positions.array[j],
                     positions.array[j + 1],
@@ -443,16 +456,7 @@ const visualization = (function initialize() {
         raycaster.setFromCamera(mouse, camera);
 
         // Points to check intersection with
-        let points;
-        Object.keys(geometryCache).forEach((key) => {
-            if (geometryCache[key].type === geometryTypes.points) {
-                if (points === undefined) {
-                    points = geometryCache[key].mesh;
-                } else {
-                    points = points.concat(geometryCache[key].mesh);
-                }
-            }
-        });
+        const points = getCachedMesh(geometryTypes.points);
         const intersects = raycaster.intersectObjects(points);
 
         if (intersects.length > 0) {
@@ -485,6 +489,31 @@ const visualization = (function initialize() {
         $detailsWrapper.find('#selected-points-details').parent().remove();
     }
 
+    /**
+     * Returns all selected points as an object with three arrays of x, y and z coordinates.
+     */
+    function getSelection() {
+        const selectedPoints = {};
+        selectedPoints.x = [];
+        selectedPoints.y = [];
+        selectedPoints.z = [];
+
+        const meshes = getCachedMesh(geometryTypes.points);
+        meshes.forEach((mesh) => {
+            const points = mesh.geometry.attributes.position;
+            const n = points.count;
+
+            // Traverse all points
+            for (let i = 0; i < n; i += 3) {
+                selectedPoints.x.push(points.array[i]);
+                selectedPoints.y.push(points.array[i + 1]);
+                selectedPoints.z.push(points.array[i + 2]);
+            }
+        });
+
+        return selectedPoints;
+    }
+
     // --- Call one-time functions
     $container[0].appendChild(renderer.domElement);
     createAxes();
@@ -509,6 +538,7 @@ const visualization = (function initialize() {
         addDetails,
         clearDetails,
         geometryTypes,
+        getSelection,
     };
 }());
 
@@ -955,4 +985,39 @@ const visualMapping = (function initialize() {
 
     // --- Bindings ---
     $fileInput.change(readContent);
+}());
+
+/**
+ * Server communication module.
+ */
+const communicator = (function init() {
+    /**
+     * Send the current selection to the server to be automatically completed.
+     */
+    function complete() {
+        const data = visualization.getSelection();
+        if (data.x.length === 0) {
+            return;
+        }
+
+        const searchParams = new URLSearchParams();
+        searchParams.append('data', JSON.stringify(data));
+        fetch('scripts/complete.cgi', {
+            method: 'POST',
+            body: searchParams,
+            headers: new Headers({
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }),
+        })
+        .then(response => response.json())
+        .catch(error => console.log('Error fetching data: ', error))
+        .then((responseData) => {
+            console.log(responseData);
+        });
+    }
+
+    // TODO: Bind to a button
+    return {
+        complete,
+    };
 }());
