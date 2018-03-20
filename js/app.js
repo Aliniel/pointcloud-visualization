@@ -94,6 +94,38 @@ const visualization = (function initialize() {
         }
     }
 
+    /**
+     * Adds a plane geometry into the visualization.
+     * @param {Object} plane Object containing 4 parameters of the plane (a, b, c, d).
+     */
+    function addSymmetryPlane(planeParams) {
+        const material = new THREE.MeshBasicMaterial({
+            color: new THREE.Color('#444444'),
+            transparent: true,
+            opacity: 0.35,
+            side: THREE.DoubleSide,
+        });
+
+        const plane = new THREE.Plane(
+            new THREE.Vector3(
+                planeParams.a,
+                planeParams.b,
+                planeParams.c,
+            ),
+            planeParams.d,
+        );
+        const geometry = new THREE.PlaneGeometry(500, 500);
+        const mesh = new THREE.Mesh(geometry, material);
+        const coplanarPoint = plane.coplanarPoint();
+        mesh.translateX(coplanarPoint.x);
+        mesh.translateY(coplanarPoint.y);
+        mesh.translateZ(coplanarPoint.z);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), plane.normal);
+
+        scene.add(mesh);
+        saveGeometry('Plane', mesh, geometryTypes.plane);
+    }
+
     // Draws the plane of symmetry
     // TODO: Add parameters for drawing the plane
     function addSymmetryPlanes(planes, label, hexColor) {
@@ -539,6 +571,7 @@ const visualization = (function initialize() {
     return {
         addPointCloud,
         addSymmetryLines,
+        addSymmetryPlane,
         addSymmetryPlanes,
         render,
         clearScene,
@@ -584,8 +617,17 @@ const userInteraction = (function initialize() {
         visualization.changeColor(elementId, this.value);
     }
 
-    // Adds interactive elements for a given object to the Tools panel
-    function addInteraction(id, alias, hexColor, visible = true, editable = true) {
+    /**
+     * Adds interactive elements for a given object to the Tools panel
+     * @param {string} id Id for the element - same as point cloud.
+     * @param {string} alias Name for the point cloud.
+     * @param {string} hexColor Color for the cloud. No hash symbol, e.g. "ffffff".
+     * @param {boolean} visible Is the cloud visible on init?
+     * @param {boolean} editable Is the color of the cloud editable?
+     * @param {object} htmlData Key value pairs for "data-*" attributes.
+     * Good for storing dirnames, etc.
+     */
+    function addInteraction(id, alias, hexColor, visible = true, editable = true, htmlData = {}) {
         let eyeClass = 'fa-eye';
         if (!visible) {
             eyeClass = 'fa-eye-slash';
@@ -596,7 +638,12 @@ const userInteraction = (function initialize() {
             colorPicker = `<input type="color" value='#${hexColor}'/>`;
         }
 
-        $toolsWrapper.append(`<li id="${id}"><i class="fa ${eyeClass} fa-2x toggable" aria-hidden="true"></i>${colorPicker}${alias}
+        // Get all the data attributes into the element
+        let htmlDataString = '';
+        Object.keys(htmlData).forEach((key) => {
+            htmlDataString += `data-${key}="${htmlData[key]}"`;
+        });
+        $toolsWrapper.append(`<li id="${id}" ${htmlDataString}><i class="fa ${eyeClass} fa-2x toggable" aria-hidden="true"></i>${colorPicker}${alias}
 </li>`);
 
         const $newElement = $toolsWrapper.find(`#${id}`);
@@ -863,28 +910,31 @@ const visualMapping = (function initialize() {
      * @param {Object} vertices Object containing three attributes of x, y and z
      * coordinate arrays of float numbers. These will be displayed as a "scanned"
      * or "ground truth" points.
+     * @param {string} dirname Name of the directory the data is being stored in.
+     * @param {numeric} index Candidate number of the cloud inside the directory.
+     * @param {object} htmlData Data to be passed for interactions.
      */
-    function addPointsToVisualization(vertices) {
-        const id = pointCloud.completed.length;
+    function addPointsToVisualization(vertices, dirname, index, htmlData = {}) {
         const count = vertices.x.length;
-        const cloudId = `completed-points-${id}`;
-        const cloudLabel = `Completed Point Set #${id}`;
-        const cloudColor = colorTresholds[0];
+        const id = `${dirname}-${index}`;
+        const cloudLabel = `Completed Point Cloud #${index}`;
 
         const completed = {
             vertices,
-            colors: () => vertices.x.map(() => cloudColor),
+            color: pointCloud.completed.color,
         };
         pointCloud.completed.push(completed);
 
         // Init the visualization
-        visualization.addPointCloud(completed, cloudId);
-        userInteraction.addInteraction(cloudId, cloudLabel, cloudColor, true, false);
+        visualization.addPointCloud(completed, id);
+        userInteraction.addInteraction(
+            id, cloudLabel, pointCloud.completed.color, false, true, htmlData,
+        );
         visualization.addDetails(
             cloudLabel,
             `${count}`,
-            `${cloudId}-details`,
-            cloudColor,
+            `${id}-details`,
+            pointCloud.completed.color,
         );
 
         visualization.render();
@@ -1038,15 +1088,18 @@ const dataManager = (function initialize() {
  * Server communication module.
  */
 const communicator = (function init() {
-    let filename;
+    let dirname;
+    const candidates = [];
 
     /**
      * Get the results of the completion tool.
+     * @param {numeric} index Index of the results to fetch.
      */
-    function getResults() {
+    function getResults(index) {
         const searchParams = new URLSearchParams();
         searchParams.append('task', 'get_results');
-        searchParams.append('filename', filename);
+        searchParams.append('dirname', dirname);
+        searchParams.append('candidate_num', index);
 
         fetch('scripts/complete.cgi', {
             method: 'POST',
@@ -1059,7 +1112,40 @@ const communicator = (function init() {
         .catch(error => console.log('Error checking progress: ', error))
         .then((responseData) => {
             const vertices = dataManager.parseData(responseData.data);
-            visualMapping.addPointsToVisualization(vertices);
+            visualMapping.addPointsToVisualization(
+                vertices,
+                dirname,
+                index,
+                {
+                    dirname,
+                    candidateNum: index,
+                },
+            );
+        });
+    }
+
+    /**
+     * Get the candidates for the global symmetry planes.
+     */
+    function getCandidates() {
+        const searchParams = new URLSearchParams();
+        searchParams.append('task', 'get_candidates');
+        searchParams.append('dirname', dirname);
+
+        fetch('scripts/complete.cgi', {
+            method: 'POST',
+            body: searchParams,
+            headers: new Headers({
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }),
+        })
+        .then(response => response.json())
+        .catch(error => console.log('Error checking progress: ', error))
+        .then((responseData) => {
+            // Print each candidate and add user interaction elements to it
+            responseData.data.forEach((planeParams, index) => {
+                getResults(index);
+            });
         });
     }
 
@@ -1069,7 +1155,7 @@ const communicator = (function init() {
     function checkProgress() {
         const searchParams = new URLSearchParams();
         searchParams.append('task', 'progress');
-        searchParams.append('filename', filename);
+        searchParams.append('dirname', dirname);
 
         let timer;
         const updateProgress = () => {
@@ -1087,7 +1173,7 @@ const communicator = (function init() {
                 console.log(progress);
                 if (parseInt(progress, 10) >= 100) {
                     clearTimeout(timer);
-                    getResults();
+                    getCandidates();
                 } else {
                     timer = setTimeout(updateProgress, 5000);
                 }
@@ -1119,7 +1205,7 @@ const communicator = (function init() {
         .catch(error => console.log('Error fetching data: ', error))
         .then((responseData) => {
             if (responseData.status === 'ok') {
-                filename = responseData.filename;
+                dirname = responseData.dirname;
                 checkProgress();
             }
         });
@@ -1129,5 +1215,7 @@ const communicator = (function init() {
     return {
         complete,
         getResults,
+        getCandidates,
+        candidates,
     };
 }());

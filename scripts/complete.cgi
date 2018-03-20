@@ -20,9 +20,9 @@ def run_completion(filename):
     os.system('bash -c "batch <<< \\"%s %s\\""' % (TOOL_PATH, os.path.abspath(filename)))
 
 
-def get_output_file_name():
+def get_dir_name():
     '''
-    Get name for the output file of the temporary object.
+    Return name of the directory where all of the temporary files will be kept.
     '''
     return 'data/%s' % (''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20)))
 
@@ -39,31 +39,33 @@ def handle_request():
         data = form.getvalue('data')
         data = json.loads(data)
 
-        output_file_name = get_output_file_name()
+        dir_name = get_dir_name()
         # Making sure we don't rewrite something
-        while os.path.isfile(output_file_name):
-            output_file_name = get_output_file_name()
-        output_file = open(output_file_name, 'w')
+        while os.path.isdir(dir_name):
+            dir_name = get_dir_name()
+        os.makedirs(dir_name)
+        input_file_name = os.path.join(dir_name, 'input')
+        input_file = open(input_file_name, 'w')
 
         for x, y, z in zip(data['x'], data['y'], data['z']):
-            output_file.write('v %s %s %s\n' % (x, y, z))
-        output_file.close()
+            input_file.write('v %s %s %s\n' % (x, y, z))
+        input_file.close()
 
-        progress_file = open('%s.progress' % output_file_name, 'w')
+        progress_file = open(os.path.join(dir_name, 'progress'), 'w')
         progress_file.write('0\n')
         progress_file.close()
 
-        run_completion(output_file_name)
+        run_completion(input_file_name)
 
         response = {
             'status': 'ok',
-            'filename': output_file_name.split('/')[-1]
+            'dirname': dir_name.split('/')[-1],
         }
         print(json.dumps(response))
 
     elif task == 'progress':
-        filename = form.getvalue('filename')
-        progress_file = open('data/%s.progress' % filename)
+        dirname = form.getvalue('dirname')
+        progress_file = open('data/%s/progress' % dirname)
         response = {
             'status': 'ok',
             'progress': progress_file.readline(),
@@ -72,13 +74,37 @@ def handle_request():
         print(json.dumps(response))
 
     elif task == 'get_results':
-        filename = form.getvalue('filename')
-        results_file = open('data/%s.complete' % filename)
+        dirname = form.getvalue('dirname')
+        candidate_num = form.getvalue('candidate_num')
+        results_file = open('data/%s/complete_%s' % (dirname, candidate_num))
         response = {
             'status': 'ok',
             'data': ''.join(results_file.readlines()),
         }
         results_file.close()
+        print(json.dumps(response))
+
+    elif task == 'get_candidates':
+        dirname = form.getvalue('dirname')
+        candidates_file = open('data/%s/candidates' % (dirname))
+        candidates = candidates_file.readlines()
+        candidates_file.close()
+
+        cand_list = []
+        for candidate in candidates:
+            cand_param = {}
+            [
+                cand_param['a'],
+                cand_param['b'],
+                cand_param['c'],
+                cand_param['d']
+            ] = candidate.split(' ')
+            cand_list.append(cand_param)
+
+        response = {
+            'status': 'ok',
+            'data': cand_list,
+        }
         print(json.dumps(response))
 
 
