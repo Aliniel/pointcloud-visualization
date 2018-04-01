@@ -1078,6 +1078,8 @@ const communicator = (function init() {
         .then(response => response.json())
         .catch(error => console.log('Error checking progress: ', error))
         .then((responseData) => {
+            // Empty the array
+            candidates.forEach(() => candidates.pop());
             // Print each candidate and add user interaction elements to it
             responseData.data.forEach((planeParams, index) => {
                 candidates.push(planeParams);
