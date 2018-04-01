@@ -1,4 +1,15 @@
-* {
+body {
+    --primary-color: #325987;
+    --primary-color-accent: #1d344f;
+    --primary-color-text: white;
+    --panel-background: #FAFAFA;
+    --panel-background-accent: #DADADA;
+    --secondary-color: #c13f3f;
+    --secondary-color-accent: #882c2c;
+    --secondary-color-text: white;
+}
+
+body {
     font-family: 'Open Sans', sans-serif;
 }
 
@@ -7,14 +18,16 @@ body {
     overflow: hidden;
 }
 
-nav#main-navigation {
+#main-navigation {
     position: fixed;
-    height: 50px;
+    height: 49px;
     width: 100%;
-    background-color: white;
+    background-color: var(--primary-color);
+    border-bottom: 1px solid var(--primary-color-accent);
+    color: var(--primary-color-text);
 }
 
-nav#main-navigation > h1 {
+#main-navigation > h1 {
     position: relative;
     top: 50%;
     margin: 0;
@@ -22,75 +35,93 @@ nav#main-navigation > h1 {
     transform: translateY(-50%);
 }
 
-div#main-wrapper {
+#main-wrapper {
     margin: 0;
     width: 100%;
     height: 100%;
 }
 
-div#main-wrapper > canvas {
+#main-wrapper > canvas {
     position: fixed;
     z-index: -1;
 }
 
-#file-input {
-    position: fixed;
-    top: 1em;
-    left: 1em;
-}
-
+/* Main element for displaying information and ui elements */
 .info-wrapper {
     position: fixed;
-    top: 1em;
-    margin-top: 50px;
+    top: 50px;
     padding: 10px;
-    background-color: white;
+    width: 300px;
+    height: calc(100% - 70px); /* 50px top + 2 * 10px top and bottom padding */
+    background-color: var(--panel-background);
+    border-right: solid 1px #dadada;
+    border-left: solid 1px #dadada;
     color: black;
-    border-radius: 8px;
-    box-shadow: 0 0 25px 1px rgba(255, 255, 255, .5);
 }
 
-#details-wrapper {
-    left: 1em;
+/* Left panel with ui elements */
+.tools-wrapper {
+
 }
 
-#details-wrapper > .details-category-label {
+/* A section inside tools wrapper */
+.tools-section {
+    margin: 10px 0px;
+    min-height: 40px;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: center;
+}
+
+/* UI Wrapper - placeholder for many interactions with visualization parts */
+.ui-wrapper {
+    height: calc(100% - 25px - 100px); /* File input field + Buttons at the bottom */
+    overflow-x: hidden;
+    overflow-y: scroll;
+    justify-content: flex-start; /* justify-content works bad with scrolling */
+}
+
+
+/* Right panel with details */
+.details-wrapper {
+    right: 0px;
+    overflow-y: scroll;
+}
+
+.details-wrapper > .details-category-label {
     font-size: 1.3em;
     font-style: italic;
     font-weight: bold;
     text-align: center;
 }
 
-#details-wrapper span.details-label {
+.details-label {
     font-style: italic;
     font-weight: bold;
+    color: var(--primary-color-accent);
 }
 
-#tools-wrapper {
-    right: 1em;
-}
-
-#tools-wrapper input[type="color"] {
+.tools-wrapper input[type="color"] {
     float: right;
     margin-left: 10px;
 }
 
-.info-wrapper > p.info-title {
+.info-title {
     margin: 10px;
     text-align: center;
     font-size: 2em;
     font-weight: bold;
+    color: var(--primary-color);
 }
 
 .info-wrapper ul {
-    margin: 10px;
     padding: 0;
     user-select: none;
 }
 
 .info-wrapper li {
     list-style: none;
-    margin: 5px 0;
 }
 .info-wrapper li:hover {
     cursor: pointer;
@@ -101,14 +132,155 @@ div#main-wrapper > canvas {
     width: 100%;
 }
 
-#tools-wrapper i.fa {
-    padding: 0 5px;
-    color: #444;
-}
-
 .text-label {
-    color: #fff;
+    color: var(--primary-color-accent);
+    opacity: 0.2;
     font-family: "Fira Mono", Monaco, "Andale Mono", "Lucida Console", "Bitstream Vera Sans Mono", "Courier New", Courier, monospace;
     margin: -5px 0 0 15px;
-    pointer-events:none;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* All buttons are restyled */
+button {
+    padding: 10px;
+    border: none;
+    background-color: var(--secondary-color);
+    color: var(--secondary-color-text);
+    font-size: 1em;
+}
+button:hover {
+    cursor: pointer;
+    background-color: var(--secondary-color-accent);
+}
+
+.fa-btn {
+    padding: 5px;
+    color: var(--primary-color);
+}
+.fa-btn:hover {
+    color: var(--primary-color-accent);
+    cursor: pointer;
+}
+
+/* Loading Screen */
+.loading-screen {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    background-color: var(--primary-color);
+}
+.loading-screen__content {
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    text-align: center;
+    color: var(--primary-color-text);
+}
+
+/* Progress Bar */
+.progress-bar {
+    margin: 0px 50px;
+    background-color: var(--panel-background);
+    height: 20px;
+}
+.progress-bar__progress {
+    background-color: var(--primary-color-accent);
+    height: 20px;
+    width: 0%;
+    transition: width 1s;
+}
+
+/* Loading screen animation */
+.sk-folding-cube {
+    margin: 20px auto;
+    width: 40px;
+    height: 40px;
+    position: relative;
+    -webkit-transform: rotateZ(45deg);
+            transform: rotateZ(45deg);
+}
+  
+.sk-folding-cube .sk-cube {
+    float: left;
+    width: 50%;
+    height: 50%;
+    position: relative;
+    -webkit-transform: scale(1.1);
+        -ms-transform: scale(1.1);
+            transform: scale(1.1); 
+}
+.sk-folding-cube .sk-cube:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--primary-color-text);
+    -webkit-animation: sk-foldCubeAngle 2.4s infinite linear both;
+            animation: sk-foldCubeAngle 2.4s infinite linear both;
+    -webkit-transform-origin: 100% 100%;
+        -ms-transform-origin: 100% 100%;
+            transform-origin: 100% 100%;
+}
+.sk-folding-cube .sk-cube2 {
+    -webkit-transform: scale(1.1) rotateZ(90deg);
+            transform: scale(1.1) rotateZ(90deg);
+}
+.sk-folding-cube .sk-cube3 {
+    -webkit-transform: scale(1.1) rotateZ(180deg);
+            transform: scale(1.1) rotateZ(180deg);
+}
+.sk-folding-cube .sk-cube4 {
+    -webkit-transform: scale(1.1) rotateZ(270deg);
+            transform: scale(1.1) rotateZ(270deg);
+}
+.sk-folding-cube .sk-cube2:before {
+    -webkit-animation-delay: 0.3s;
+            animation-delay: 0.3s;
+}
+.sk-folding-cube .sk-cube3:before {
+    -webkit-animation-delay: 0.6s;
+            animation-delay: 0.6s; 
+}
+.sk-folding-cube .sk-cube4:before {
+    -webkit-animation-delay: 0.9s;
+            animation-delay: 0.9s;
+}
+@-webkit-keyframes sk-foldCubeAngle {
+    0%, 10% {
+      -webkit-transform: perspective(140px) rotateX(-180deg);
+              transform: perspective(140px) rotateX(-180deg);
+      opacity: 0; 
+    } 25%, 75% {
+      -webkit-transform: perspective(140px) rotateX(0deg);
+              transform: perspective(140px) rotateX(0deg);
+      opacity: 1; 
+    } 90%, 100% {
+      -webkit-transform: perspective(140px) rotateY(180deg);
+              transform: perspective(140px) rotateY(180deg);
+      opacity: 0; 
+    } 
+}
+  
+@keyframes sk-foldCubeAngle {
+    0%, 10% {
+      -webkit-transform: perspective(140px) rotateX(-180deg);
+              transform: perspective(140px) rotateX(-180deg);
+      opacity: 0; 
+    } 25%, 75% {
+      -webkit-transform: perspective(140px) rotateX(0deg);
+              transform: perspective(140px) rotateX(0deg);
+      opacity: 1; 
+    } 90%, 100% {
+      -webkit-transform: perspective(140px) rotateY(180deg);
+              transform: perspective(140px) rotateY(180deg);
+      opacity: 0; 
+    }
 }

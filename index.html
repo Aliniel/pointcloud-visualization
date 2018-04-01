@@ -12,25 +12,46 @@
         </nav>
         <div id="main-wrapper"><!-- Canvas goes here --></div>
         <!-- Everything else is fixed -->
-        <input id="file-input" type="file" name="file-input" value=""/>
-        <div id="details-wrapper" class="info-wrapper">
-            <p class="info-title">Details</p>
-            <hr/>
+        <div id="details-wrapper" class="info-wrapper details-wrapper">
+            <div class="details-wrapper__general"></div>
+            <div class="details-wrapper__completed"></div>
         </div>
-        <div id="tools-wrapper" class="info-wrapper">
-            <p class="info-title">Tools</p>
-            <hr/>
-            <ul>
-                <li id="axes"><i class="fa fa-eye fa-2x toggable" aria-hidden="true"></i>Coordinate Axes</li>
+        <div id="tools-wrapper" class="info-wrapper tools-wrapper">
+            <div class="tools-section">
+                Upload a File to start
+                <input id="file-input" type="file" name="file-input" value=""/>
+            </div>
+            <ul class="tools-section ui-wrapper js-ui-wrapper">
+                <li id="axes"><i class="fa fa-eye toggable fa-btn" aria-hidden="true" title="Toggle Visibility"></i>Coordinate Axes</li>
                 <li id="selection-size">
                     <div>
                         Selection Area Size
                         <input type="range" value="20" min="5" max="50"/><span>20</span>
                     </div>
                 </li>
-                <li id="refresh"><i class="fa fa-refresh fa-2x" aria-hidden="true"></i>Reset Highlight</li>
+                <li id="refresh"><i class="fa fa-refresh fa-btn" aria-hidden="true" title="Reset Highlight"></i>Reset Highlight</li>
                 <!-- User interaction will be inserted here via JavaScript. -->
             </ul>
+            <div class="tools-section js-controls-panel">
+                <button class="js-complete-btn" title="Submit to the server for automatic completion">Complete</button>
+            </div>
+        </div>
+
+        <div class="loading-screen">
+            <div class="loading-screen__content">
+                <!-- Animation -->
+                <div class="sk-folding-cube">
+                    <div class="sk-cube1 sk-cube"></div>
+                    <div class="sk-cube2 sk-cube"></div>
+                    <div class="sk-cube4 sk-cube"></div>
+                    <div class="sk-cube3 sk-cube"></div>
+                </div>
+
+                <p>Please wait...</p>
+                <div class="progress-bar">
+                    <div class="progress-bar__progress"></div>
+                </div>
+            </div>
         </div>
 
         <script src="js/jquery.min.js"></script>

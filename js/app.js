@@ -13,6 +13,8 @@ const visualization = (function initialize() {
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.autoClear = true;
+    renderer.setClearColor(0xffffff, 1);
+
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     const raycaster = new THREE.Raycaster();
@@ -38,7 +40,7 @@ const visualization = (function initialize() {
     let selectedPoint;
     const dataRange = 200;
     // Highlight parameters
-    const fadedAlpha = 0.2;
+    const fadedAlpha = 0.1;
     const highlightedAlpha = 0.8;
 
     // Cache DOM
@@ -54,22 +56,22 @@ const visualization = (function initialize() {
         renderer.render(scene, camera);
     }
 
-    // Add information to the details section in form of <label, value>
-    function addDetailsCategory(label) {
-        const formattedLabel = `<p class="details-category-label">${label}</p>`;
-        $detailsWrapper.append(formattedLabel);
-    }
-
-    // Add information to the details section in form of <label, value>
-    function addDetails(label, value, id = '', hexColor) {
+    /**
+     * Adds a details section of the point cloud.
+     * @param {string} label Text label to be printed on the panel.
+     * @param {string} value Value to be printed next to the label.
+     * @param {string} id ID of the element.
+     * @param {string} type One of: general or completed.
+     */
+    function addDetails(label, value, id, type) {
         const formattedLabel = `<p><span id="${id}" class="details-label">${label}:</span> ${value}</p>`;
-        $detailsWrapper.append(formattedLabel);
-        $detailsWrapper.find(`#${id}`).css('color', hexColor);
+        $detailsWrapper.find(`.details-wrapper__${type}`).append(formattedLabel);
     }
 
     // Clear the details section
     function clearDetails() {
-        $detailsWrapper.find('p:not(.info-title)').remove();
+        $detailsWrapper.find('.details-wrapper__general > *').remove();
+        $detailsWrapper.find('.details-wrapper__completed > *').remove();
     }
 
     /**
@@ -101,7 +103,7 @@ const visualization = (function initialize() {
      */
     function addSymmetryPlane(planeParams, label) {
         const material = new THREE.MeshBasicMaterial({
-            color: new THREE.Color('#444444'),
+            color: new THREE.Color('#DADADA'),
             transparent: true,
             opacity: 0.35,
             side: THREE.DoubleSide,
@@ -120,6 +122,7 @@ const visualization = (function initialize() {
         );
 
         const geometry = new THREE.PlaneGeometry(500, 500);
+        geometry.name = 'plane';
         const mesh = new THREE.Mesh(geometry, material);
 
         // Move and rotate correctly
@@ -221,9 +224,9 @@ const visualization = (function initialize() {
     function createAxisValue(i, axis) {
         const geometry = new THREE.SphereGeometry(1, 2, 2);
         const material = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: 0x1d344f,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.1,
         });
         const sphere = new THREE.Mesh(geometry, material);
         scene.add(sphere);
@@ -248,7 +251,7 @@ const visualization = (function initialize() {
     // Adds axes to the scene
     function createAxes() {
         const axesLength = dataRange;
-        const axesColor = new THREE.Color(1, 1, 1);
+        const axesColor = new THREE.Color('#1d344f');
 
         const axesStart = [
             new THREE.Vector3(-axesLength, 0, 0),
@@ -264,7 +267,7 @@ const visualization = (function initialize() {
         const material = new THREE.LineBasicMaterial({
             color: axesColor,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.1,
         });
 
         // Axes shouldn't be removed. Ever.
@@ -403,6 +406,10 @@ const visualization = (function initialize() {
     // Change the color of a visual object
     function changeColor(meshId, hexaColor) {
         geometryCache[meshId].mesh.forEach((item) => {
+            if (item.geometry.name === 'plane') {
+                // Do not change color for the planes
+                return;
+            }
             const mesh = item;
             if (mesh.material.color !== undefined) {
                 mesh.material.color = new THREE.Color(hexaColor);
@@ -411,8 +418,6 @@ const visualization = (function initialize() {
             }
             mesh.material.needsUpdate = true;
         });
-
-        $detailsWrapper.find(`#${meshId}-details`).css('color', `${hexaColor}`);
         render();
     }
 
@@ -492,7 +497,7 @@ const visualization = (function initialize() {
 
         $detailsWrapper.find('#selected-points-details').parent().remove();
         const highlightPercentage = ((totalHighlighted / totalPoints) * 100).toFixed(2);
-        addDetails('Selected Points', `${totalHighlighted} (${highlightPercentage}%)`, 'selected-points-details');
+        addDetails('Selected Points', `${totalHighlighted} (${highlightPercentage}%)`, 'selected-points-details', 'general');
     }
 
     // On mouse click event highlight the area around the selected point
@@ -568,6 +573,13 @@ const visualization = (function initialize() {
         return selectedPoints;
     }
 
+    /**
+     * Clear old details elements.
+     */
+    function clearOldDetails() {
+        $detailsWrapper.find('.details-wrapper__completed *').remove();
+    }
+
     // --- Call one-time functions
     $container[0].appendChild(renderer.domElement);
     createAxes();
@@ -589,9 +601,9 @@ const visualization = (function initialize() {
         toggleObjectVisibility,
         updateSelectionRegionSize,
         resetHighlight,
-        addDetailsCategory,
         addDetails,
         clearDetails,
+        clearOldDetails,
         geometryTypes,
         getSelection,
     };
@@ -600,11 +612,12 @@ const visualization = (function initialize() {
 // --- User Interactions Module ---
 const userInteraction = (function initialize() {
     // --- DOM Cache ---
-    const $toolsWrapper = $('#tools-wrapper').find('ul');
+    const $uiWrapper = $('.js-ui-wrapper');
     const persistantSettings = ['axes', 'selection-size', 'refresh'];
-    const $selectionAreaSlider = $toolsWrapper.find('#selection-size').find('input[type="range"]');
-    const $selectionAreaValue = $toolsWrapper.find('#selection-size').find('span');
-    const $resetButton = $toolsWrapper.find('#refresh');
+    const $selectionAreaSlider = $uiWrapper.find('#selection-size').find('input[type="range"]');
+    const $selectionAreaValue = $uiWrapper.find('#selection-size').find('span');
+    const $resetButton = $uiWrapper.find('#refresh');
+    const $loadingScreen = $('.loading-screen');
 
     // --- Functions ---
     /**
@@ -635,42 +648,37 @@ const userInteraction = (function initialize() {
      * @param {string} alias Name for the point cloud.
      * @param {string} hexColor Color for the cloud. No hash symbol, e.g. "ffffff".
      * @param {boolean} visible Is the cloud visible on init?
-     * @param {boolean} editable Is the color of the cloud editable?
+     * @param {string} classes Additional classes to be added to the ui element.
      * @param {object} htmlData Key value pairs for "data-*" attributes.
      * Good for storing dirnames, etc.
      */
-    function addInteraction(id, alias, hexColor, visible = true, editable = true, htmlData = {}) {
+    function addInteraction(id, alias, hexColor, visible = true, classes = '', htmlData = {}) {
         let eyeClass = 'fa-eye';
         if (!visible) {
             eyeClass = 'fa-eye-slash';
         }
 
-        let colorPicker = '';
-        if (editable) {
-            colorPicker = `<input type="color" value='#${hexColor}'/>`;
-        }
+        const colorPicker = `<input type="color" value='#${hexColor}'/>`;
 
         // Get all the data attributes into the element
         let htmlDataString = '';
         Object.keys(htmlData).forEach((key) => {
             htmlDataString += `data-${key}="${htmlData[key]}"`;
         });
-        $toolsWrapper.append(`<li id="${id}" ${htmlDataString}><i class="fa ${eyeClass} fa-2x toggable" aria-hidden="true"></i>${colorPicker}${alias}
+        $uiWrapper.append(`<li id="${id}" ${htmlDataString}><i class="fa ${eyeClass} toggable fa-btn ${classes}" aria-hidden="true"></i>${colorPicker}${alias}
 </li>`);
 
-        const $newElement = $toolsWrapper.find(`#${id}`);
+        const $newElement = $uiWrapper.find(`#${id}`);
         $newElement.find('i').click(toggleObject);
-        if (!editable) {
-            $newElement.find('i').css('color', hexColor);
-        }
+        $newElement.find('i').css('color', hexColor);
 
-        const $colorPicker = $toolsWrapper.find('input[type="color"]');
+        const $colorPicker = $uiWrapper.find('input[type="color"]');
         $colorPicker.change(changeColorMapping);
     }
 
     // Clears the toolbox
     function clearToolbox() {
-        $toolsWrapper.find('li').each((index, element) => {
+        $uiWrapper.find('li').each((index, element) => {
             if (persistantSettings.indexOf($(element).prop('id')) === -1) {
                 $(element).remove();
             }
@@ -689,15 +697,49 @@ const userInteraction = (function initialize() {
         visualization.resetHighlight();
     }
 
+    /**
+     * Display the loading screen.
+     */
+    function showLoadingScreen() {
+        $loadingScreen.show();
+    }
+
+    /**
+     * Update the progress on the progress bar.
+     * @param {numeric} progress Percentage of the progress.
+     */
+    function updateProgressBar(progress) {
+        $loadingScreen.find('.progress-bar__progress').css('width', `${progress}%`);
+    }
+
+    /**
+     * Hide the loading screen.
+     */
+    function hideLoadingScreen() {
+        $loadingScreen.hide();
+        updateProgressBar(0);
+    }
+
+    /**
+     * Clear old UI elements when attempting to complete again.
+     */
+    function clearUi() {
+        $uiWrapper.find('js-ui-completed').remove();
+
+    }
+
     // --- Bindings ---
     // Bind toggle for present interactions at start
-    $toolsWrapper.find('.toggable').click(toggleObject);
+    $uiWrapper.find('.toggable').click(toggleObject);
     $selectionAreaSlider.on('input', updateSelectionSizeValue);
     $resetButton.on('click', resetVisualization);
 
     return {
         addInteraction,
         clearToolbox,
+        showLoadingScreen,
+        hideLoadingScreen,
+        updateProgressBar,
     };
 }());
 
@@ -776,9 +818,8 @@ const visualMapping = (function initialize() {
         // Init the visualization
         const scannedCount = pointCloud.scanned.vertices.x.length;
         visualization.addPointCloud(pointCloud.scanned, 'scanned-points');
-        visualization.addDetailsCategory('Point Cloud Summary');
-        visualization.addDetails('Total points', `${scannedCount} (100%)`, 'total-points-details');
-        visualization.addDetails('Scanned points', `${scannedCount} (100%)`, 'scanned-points-details');
+        visualization.addDetails('Total points', `${scannedCount} (100%)`, 'total-points-details', 'general');
+        visualization.addDetails('Scanned points', `${scannedCount} (100%)`, 'scanned-points-details', 'general');
 
         userInteraction.addInteraction('scanned-points', 'Scanned Points', pointCloud.scanned.color.getHexString());
         visualization.render();
@@ -808,13 +849,13 @@ const visualMapping = (function initialize() {
         // Init the visualization
         visualization.addPointCloud(completed, id);
         userInteraction.addInteraction(
-            id, cloudLabel, pointCloud.completed.color.getHexString(), visible, true, htmlData,
+            id, cloudLabel, pointCloud.completed.color.getHexString(), visible, 'js-ui-completed', htmlData,
         );
         visualization.addDetails(
             cloudLabel,
             `${count}`,
             `${id}-details`,
-            pointCloud.completed.color.getHexString(),
+            'completed',
         );
         if (!visible) {
             // Render is already called inside
@@ -975,6 +1016,10 @@ const communicator = (function init() {
     let dirname;
     const candidates = [];
 
+    /* --- DOM CACHE --- */
+    const $controlsPanel = $('.js-controls-panel');
+    const $completeBtn = $controlsPanel.find('.js-complete-btn');
+
     /**
      * Get the results of the completion tool.
      * @param {numeric} index Index of the results to fetch.
@@ -1038,6 +1083,7 @@ const communicator = (function init() {
                 candidates.push(planeParams);
                 getResults(index);
             });
+            userInteraction.hideLoadingScreen();
         });
     }
 
@@ -1062,7 +1108,7 @@ const communicator = (function init() {
             .catch(error => console.log('Error checking progress: ', error))
             .then((responseData) => {
                 const progress = responseData.progress;
-                console.log(progress);
+                userInteraction.updateProgressBar(parseInt(progress, 10));
                 if (parseInt(progress, 10) >= 100) {
                     clearTimeout(timer);
                     getCandidates();
@@ -1077,6 +1123,10 @@ const communicator = (function init() {
      * Send the current selection to the server to be automatically completed.
      */
     function complete() {
+        userInteraction.showLoadingScreen();
+        userInteraction.clearToolbox();
+        visualization.clearOldDetails();
+
         const data = visualization.getSelection();
         if (data.x.length === 0) {
             return;
@@ -1102,6 +1152,9 @@ const communicator = (function init() {
             }
         });
     }
+
+    /* --- BINDINGS --- */
+    $completeBtn.click(complete);
 
     // TODO: Bind to a button, remove getResults
     return {
