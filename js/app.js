@@ -665,7 +665,7 @@ const userInteraction = (function initialize() {
         Object.keys(htmlData).forEach((key) => {
             htmlDataString += `data-${key}="${htmlData[key]}"`;
         });
-        $uiWrapper.append(`<li id="${id}" ${htmlDataString}><i class="fa ${eyeClass} toggable fa-btn ${classes}" aria-hidden="true"></i>${colorPicker}${alias}
+        $uiWrapper.append(`<li id="${id}" class="${classes}" ${htmlDataString}><i class="fa ${eyeClass} toggable fa-btn" aria-hidden="true"></i>${colorPicker}${alias}
 </li>`);
 
         const $newElement = $uiWrapper.find(`#${id}`);
@@ -724,8 +724,7 @@ const userInteraction = (function initialize() {
      * Clear old UI elements when attempting to complete again.
      */
     function clearUi() {
-        $uiWrapper.find('js-ui-completed').remove();
-
+        $uiWrapper.find('.js-ui-completed').remove();
     }
 
     // --- Bindings ---
@@ -740,6 +739,7 @@ const userInteraction = (function initialize() {
         showLoadingScreen,
         hideLoadingScreen,
         updateProgressBar,
+        clearUi,
     };
 }());
 
@@ -1126,7 +1126,7 @@ const communicator = (function init() {
      */
     function complete() {
         userInteraction.showLoadingScreen();
-        userInteraction.clearToolbox();
+        userInteraction.clearUi();
         visualization.clearOldDetails();
 
         const data = visualization.getSelection();
