@@ -421,14 +421,25 @@ const visualization = (function initialize() {
         render();
     }
 
-    // Show or hide point cloud
+    /**
+     * Toggle visibility of a mesh
+     * @param {string} objectLabel Label of the mesh
+     */
     function toggleObjectVisibility(objectLabel) {
+        // Do not attempt to toggle plane if it doesn't exist for the point cloud
+        if (objectLabel.indexOf('plane') !== -1 && !geometryCache[objectLabel]) {
+            return;
+        }
+
+        // Toggle visibility
         if (geometryCache[objectLabel].visible) {
             geometryCache[objectLabel].mesh.forEach(mesh => scene.remove(mesh));
         } else {
             geometryCache[objectLabel].mesh.forEach(mesh => scene.add(mesh));
         }
         geometryCache[objectLabel].visible = !geometryCache[objectLabel].visible;
+
+        // Hide axes if needed
         if (objectLabel === 'axes') {
             try {
                 $axesLabels.toggle();
@@ -444,12 +455,17 @@ const visualization = (function initialize() {
     /**
      * Returns cached meshes by type.
      * @param {string} type Type of mesh to return. Use enum geometryType.
+     * @param {boolean} visibilityCheck Check for visibility?
      * @return {Object[]} Array of Three.js meshes.
      */
-    function getCachedMesh(type) {
+    function getCachedMesh(type, visibilityCheck = false) {
         let objects;
         Object.keys(geometryCache).forEach((key) => {
             if (geometryCache[key].type === type) {
+                // Check visibility if requested
+                if (visibilityCheck && !geometryCache[key].visible) {
+                    return;
+                }
                 if (objects === undefined) {
                     objects = geometryCache[key].mesh;
                 } else {
@@ -574,6 +590,30 @@ const visualization = (function initialize() {
     }
 
     /**
+     * Returns all visible points.
+     */
+    function getAllVisiblePoints() {
+        const visiblePoints = [];
+
+        const meshes = getCachedMesh(geometryTypes.points, true);
+        meshes.forEach((mesh) => {
+            const points = mesh.geometry.attributes.position;
+            const n = points.count;
+
+            // Traverse all points
+            for (let i = 0; i < n; i += 1) {
+                visiblePoints.push({
+                    x: points.array[i * 3],
+                    y: points.array[(i * 3) + 1],
+                    z: points.array[(i * 3) + 2],
+                });
+            }
+        });
+
+        return visiblePoints;
+    }
+
+    /**
      * Clear old details elements.
      */
     function clearOldDetails() {
@@ -606,6 +646,7 @@ const visualization = (function initialize() {
         clearOldDetails,
         geometryTypes,
         getSelection,
+        getAllVisiblePoints,
     };
 }());
 
@@ -618,13 +659,16 @@ const userInteraction = (function initialize() {
     const $selectionAreaValue = $uiWrapper.find('#selection-size').find('span');
     const $resetButton = $uiWrapper.find('#refresh');
     const $loadingScreen = $('.loading-screen');
+    const $controlsPanel = $('.js-controls-panel');
 
     // --- Functions ---
     /**
      * Toggle object visibility in the visualization
      */
     function toggleObject() {
-        visualization.toggleObjectVisibility($(this).parent().attr('id'));
+        const label = $(this).parent().attr('id');
+        visualization.toggleObjectVisibility(label);
+        visualization.toggleObjectVisibility(`${label}-plane`);
 
         const $eye = $(this);
         if ($eye.hasClass('fa-eye')) {
@@ -727,11 +771,40 @@ const userInteraction = (function initialize() {
         $uiWrapper.find('.js-ui-completed').remove();
     }
 
+    /**
+     * Download contents as a file with a given file name.
+     * @param {string} filename Name of the file.
+     * @param {string} text Content of the file.
+     */
+    function download(filename, text) {
+        const $element = $('<a/>');
+        $element.attr('href', `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`);
+        $element.attr('download', filename);
+
+        $element.hide();
+        $('body').append($element);
+
+        $element[0].click();
+
+        $element.remove();
+    }
+
+    /**
+     * Export all the points in a PLY file formam.
+     */
+    function exportPoints() {
+        const points = visualization.getAllVisiblePoints();
+        const content = `ply\nformat ascii 1.0\nelement vertex ${points.length}\nproperty float x\nproperty float y\nproperty float z\nend_header\n${points.map(point => `${point.x} ${point.y} ${point.z}\n`).join('')}`;
+        const fileName = 'point-cloud.ply';
+        download(fileName, content);
+    }
+
     // --- Bindings ---
     // Bind toggle for present interactions at start
     $uiWrapper.find('.toggable').click(toggleObject);
     $selectionAreaSlider.on('input', updateSelectionSizeValue);
     $resetButton.on('click', resetVisualization);
+    $controlsPanel.find('.js-export-btn').click(exportPoints);
 
     return {
         addInteraction,
@@ -860,6 +933,7 @@ const visualMapping = (function initialize() {
         if (!visible) {
             // Render is already called inside
             visualization.toggleObjectVisibility(id);
+            visualization.toggleObjectVisibility(`${id}-plane`);
         } else {
             visualization.render();
         }
@@ -1041,7 +1115,7 @@ const communicator = (function init() {
         .catch(error => console.log('Error checking progress: ', error))
         .then((responseData) => {
             const vertices = dataManager.parseData(responseData.data);
-            visualization.addSymmetryPlane(candidates[index], `${dirname}-${index}`);
+            visualization.addSymmetryPlane(candidates[index], `${dirname}-${index}-plane`);
             visualMapping.addPointsToVisualization(
                 vertices,
                 dirname,

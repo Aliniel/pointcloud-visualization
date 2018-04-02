@@ -76,7 +76,7 @@ body {
 
 /* UI Wrapper - placeholder for many interactions with visualization parts */
 .ui-wrapper {
-    height: calc(100% - 25px - 100px); /* File input field + Buttons at the bottom */
+    height: calc(100% - 25px - 140px); /* File input field + Buttons at the bottom */
     overflow-x: hidden;
     overflow-y: scroll;
     justify-content: flex-start; /* justify-content works bad with scrolling */
@@ -143,6 +143,7 @@ body {
 
 /* All buttons are restyled */
 button {
+    margin: 5px 0px;
     padding: 10px;
     border: none;
     background-color: var(--secondary-color);
@@ -187,6 +188,7 @@ button:hover {
 .progress-bar {
     margin: 0px 50px;
     background-color: var(--panel-background);
+    border: solid 1px var(--primary-color-accent);
     height: 20px;
 }
 .progress-bar__progress {
